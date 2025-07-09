@@ -1,1 +1,1 @@
-This package is developing for RoboStore.s
+This package is developing for RoboStore.
