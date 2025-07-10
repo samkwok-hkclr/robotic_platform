@@ -20,13 +20,14 @@
 
 #include "robotic_platform_msgs/msg/replenish_pose.hpp"
 #include "robotic_platform_msgs/msg/replenish_quantity.hpp"
+#include "robotic_platform_msgs/msg/robot_status.hpp"
 #include "robotic_platform_msgs/msg/localization_param.hpp"
+
 #include "robotic_platform_msgs/srv/get_slot_state_trigger.hpp"
 #include "robotic_platform_msgs/srv/get_object_pose_trigger.hpp"
 
 #include "robot_controller_msgs/srv/execute_waypoints.hpp"
 #include "robot_controller_msgs/srv/get_current_pose.hpp"
-
 
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -36,6 +37,9 @@ class WorkflowPlanner : public rclcpp::Node
   using ExecuteWaypoints = robot_controller_msgs::srv::ExecuteWaypoints;
   using GetCurrentPose = robot_controller_msgs::srv::GetCurrentPose;
 
+  using ReplenishPose = robotic_platform_msgs::msg::ReplenishPose;
+  using ReplenishQuantity = robotic_platform_msgs::msg::ReplenishQuantity;
+  using RobotStatus = robotic_platform_msgs::msg::RobotStatus;
   using LocalizationParam = robotic_platform_msgs::msg::LocalizationParam;
 
   using GetSlotStateTrigger = robotic_platform_msgs::srv::GetSlotStateTrigger;
@@ -83,10 +87,13 @@ public:
 
 private:
   std::mutex mutex_;
+
+  uint8_t state_ = 0;
   
   rclcpp::CallbackGroup::SharedPtr action_ser_cbg_;
   rclcpp::CallbackGroup::SharedPtr srv_cli_cbg_;
   rclcpp::CallbackGroup::SharedPtr vison_srv_cli_cbg_;
+  rclcpp::CallbackGroup::SharedPtr exec_timer_cbg_;
 
   rclcpp::Client<ExecuteWaypoints>::SharedPtr exec_wps_cli_;
   rclcpp::Client<GetCurrentPose>::SharedPtr get_curr_pose_cli_;

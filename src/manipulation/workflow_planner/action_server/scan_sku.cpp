@@ -7,11 +7,9 @@ rclcpp_action::GoalResponse WorkflowPlanner::scan_sku_goal_cb(
   (void)uuid;
   std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
 
-  // set state
-  if (false)
+  if (state_ != RobotStatus::IDLE)
   {
-    RCLCPP_INFO(get_logger(), "FIXME rclcpp_action::GoalResponse::REJECT");
-    // set state
+    RCLCPP_INFO(get_logger(), "Robot is not idle");
     return rclcpp_action::GoalResponse::REJECT;
   }
 
@@ -51,7 +49,14 @@ void WorkflowPlanner::scan_sku_execution(const std::shared_ptr<GoalHandlerScanSk
   
   auto result = std::make_shared<ScanSku::Result>();
 
-  std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
+  auto pub_fb = [this, &goal_handle, &feedback]() {
+    RCLCPP_INFO(get_logger(), "Publish feedback!!!!!!!!!!!!!!!!!");
+    goal_handle->publish_feedback(feedback);
+  };
+  
+  rclcpp::TimerBase::SharedPtr pub_fb_timer = create_wall_timer(std::chrono::seconds(1), pub_fb, exec_timer_cbg_);
+
+  // std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
 
   std::vector<std::pair<int, std::vector<double>>> selling_slot_vec {
     {174,   { 0.22, -0.555, 0.81, 0.5, 0.5, -0.5, 0.5 } },     //"Nescafe Continental Coffee 250ml"
@@ -82,8 +87,6 @@ void WorkflowPlanner::scan_sku_execution(const std::shared_ptr<GoalHandlerScanSk
 
   for (const auto &sku_pair : selling_slot_vec) 
   {
-    RCLCPP_ERROR(get_logger(), "AAAAA");
-
     const uint8_t target_obj_id = sku_pair.first;
     reset_req_res<ExecuteWaypoints>(request, response);
     request = std::make_shared<ExecuteWaypoints::Request>();
@@ -106,14 +109,12 @@ void WorkflowPlanner::scan_sku_execution(const std::shared_ptr<GoalHandlerScanSk
       break;
     }
     
-    RCLCPP_ERROR(get_logger(), "BBBBB");
     if (are_poses_equal(get_pose_response->pose, compose_pose_msg(sku_pair.second)))
     {
-      RCLCPP_ERROR(get_logger(), "It is close");
       RCLCPP_INFO(get_logger(), "scanning sku: [%d]", target_obj_id);
 
       auto get_slot_state_request = std::make_shared<GetSlotStateTrigger::Request>();
-      get_slot_state_request->camera_id = 1;
+      get_slot_state_request->camera_id = goal->camera_id;
       get_slot_state_request->target_object_id = target_obj_id;
       GetSlotStateTrigger::Response::SharedPtr get_slot_state_response;
       if (!(send_sync_req<GetSlotStateTrigger>(get_slot_state_tri_cli_, get_slot_state_request, get_slot_state_response, __FUNCTION__) && get_slot_state_response))
@@ -121,11 +122,11 @@ void WorkflowPlanner::scan_sku_execution(const std::shared_ptr<GoalHandlerScanSk
         RCLCPP_ERROR(get_logger(), "Sent GetCurrentPose request failed");
         break;
       }
-      RCLCPP_INFO(get_logger(), "%d remain_qty: [%d]", target_obj_id, get_slot_state_response->remain_qty);
+      RCLCPP_INFO(get_logger(), "SKU ID: %d, remain_qty: [%d]", target_obj_id, get_slot_state_response->remain_qty);
     }
     else
     {
-      RCLCPP_ERROR(get_logger(), "It is not close");
+      RCLCPP_ERROR(get_logger(), "It is not close!!!");
     }
   }
 
@@ -141,6 +142,7 @@ void WorkflowPlanner::scan_sku_execution(const std::shared_ptr<GoalHandlerScanSk
 
   if (rclcpp::ok()) 
   {
+    pub_fb_timer->cancel();
     result->info = {};
     goal_handle->succeed(result);
 

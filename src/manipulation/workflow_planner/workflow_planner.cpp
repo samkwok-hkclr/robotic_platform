@@ -4,9 +4,12 @@ WorkflowPlanner::WorkflowPlanner(
   const rclcpp::NodeOptions& options)
 : Node("workflow_planner", options)
 {
+  state_ = RobotStatus::IDLE;
+
   srv_cli_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   action_ser_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   vison_srv_cli_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  exec_timer_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   exec_wps_cli_ = create_client<ExecuteWaypoints>(
     "execute_waypoints", 
