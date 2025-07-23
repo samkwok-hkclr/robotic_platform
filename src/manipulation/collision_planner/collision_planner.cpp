@@ -2,7 +2,7 @@
 
 CollisionPlanner::CollisionPlanner(
   const rclcpp::NodeOptions& options)
-: Node("collision_planner", options)
+: PlannerBase("collision_planner", options)
 {
   declare_parameter<bool>("sim", true);
   declare_parameter<std::string>("collision_objects_file", "");
@@ -178,7 +178,7 @@ bool CollisionPlanner::get_col_obj_from_scene(std::vector<std::string>& object_i
   }
   
   GetCollisionObjectsFromScene::Response::SharedPtr response;
-  if (!(send_req<GetCollisionObjectsFromScene>(get_col_obj_from_secne_cli_, request, response, __FUNCTION__) && response))
+  if (!(send_sync_req<GetCollisionObjectsFromScene>(get_col_obj_from_secne_cli_, request, response, __FUNCTION__) && response))
   {
     RCLCPP_ERROR(get_logger(), "Sent GetCollisionObjectsFromScene request failed");
     return false;
@@ -229,7 +229,7 @@ bool CollisionPlanner::add_col_obj(const std::vector<std::string>& existing_obje
   }
 
   AddCollisionObjects::Response::SharedPtr response;
-  if (!(send_req<AddCollisionObjects>(add_col_obj_cli_, request, response, __FUNCTION__) && response))
+  if (!(send_sync_req<AddCollisionObjects>(add_col_obj_cli_, request, response, __FUNCTION__) && response))
   {
     RCLCPP_ERROR(get_logger(), "Sent AddCollisionObjects request failed");
     return false;
@@ -259,7 +259,7 @@ bool CollisionPlanner::add_col_obj(const moveit_msgs::msg::CollisionObject::Shar
   request->collision_objects.push_back(std::move(*object));
 
   AddCollisionObjects::Response::SharedPtr response;
-  if (!(send_req<AddCollisionObjects>(add_col_obj_cli_, request, response, __FUNCTION__) && response))
+  if (!(send_sync_req<AddCollisionObjects>(add_col_obj_cli_, request, response, __FUNCTION__) && response))
   {
     RCLCPP_ERROR(get_logger(), "Sent AddCollisionObjects request failed");
     return false;
@@ -363,66 +363,4 @@ void CollisionPlanner::sort_collision_objects(void)
 bool CollisionPlanner::compare_id(const CollisionObject &a, const CollisionObject &b)
 {
   return a.id < b.id;
-}
-
-template <typename T>
-bool CollisionPlanner::send_req(
-  typename rclcpp::Client<T>::SharedPtr cli, 
-  const typename T::Request::SharedPtr request,
-  typename T::Response::SharedPtr& response,
-  const std::string srv_name) const
-{
-  if (!cli_wait_for_srv<T>(cli, srv_name))
-  {
-    RCLCPP_INFO(get_logger(), "Failed to wait service");
-    return false;
-  }
-
-  auto future = cli->async_send_request(request);
-  std::future_status status = future.wait_for(CLI_REQ_TIMEOUT);
-
-  switch (status)
-  {
-  case std::future_status::ready:
-    // Yech!!!
-    break;
-  case std::future_status::deferred:
-    RCLCPP_INFO(get_logger(), "Failed to call service %s, status: %s", srv_name.c_str(), "deferred");
-    return false;
-  case std::future_status::timeout:
-    RCLCPP_INFO(get_logger(), "Failed to call service %s, status: %s", srv_name.c_str(), "timeout");
-    return false;
-  }
-
-  response = future.get();
-
-  if (!response->success)
-  {
-    RCLCPP_INFO(get_logger(), "Service %s call failed with error: {%s}", srv_name.c_str(), response->message.c_str());
-    return false;
-  }
-
-  return true;
-}
-
-template <typename T>
-bool CollisionPlanner::cli_wait_for_srv(
-  typename rclcpp::Client<T>::SharedPtr cli, 
-  const std::string srv_name) const
-{
-  uint8_t retry = 0;
-
-  while (rclcpp::ok() && !cli->wait_for_service(std::chrono::milliseconds(100)))
-  {
-    if (retry >= SRV_CLI_MAX_RETIES)
-    {
-      RCLCPP_DEBUG(get_logger(), "Interrupted while waiting for the service. Exiting.");
-      return false;
-    }
-
-    RCLCPP_DEBUG(get_logger(), "%s service not available, waiting again...", srv_name.c_str());
-    retry++;
-  }
-
-  return true;
 }

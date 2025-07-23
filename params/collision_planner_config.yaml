@@ -1,3 +1,0 @@
-collision_planner:
-  ros__parameters:
-    sim: False

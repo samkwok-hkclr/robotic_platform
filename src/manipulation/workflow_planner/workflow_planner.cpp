@@ -1,35 +1,88 @@
 #include "manipulation/workflow_planner/workflow_planner.hpp"
 
 WorkflowPlanner::WorkflowPlanner(
-  const rclcpp::NodeOptions& options)
-: Node("workflow_planner", options)
+  const rclcpp::NodeOptions& options,
+  std::shared_ptr<MotionPlanner> motion_planner)
+: PlannerBase("workflow_planner", options)
 {
+  declare_parameter<std::string>("poses_file", "");
+
+  std::string poses_file;
+  get_parameter("poses_file", poses_file);
+
+  PosesLoader loader;
+  std::optional<YAML::Node> config = loader.parse_yaml(poses_file);
+  if (!config.has_value())
+  {
+    rclcpp::shutdown();
+    return;
+  }
+
+  // std::vector<std::pair<int, int>> fixme = {}; // FIXME: how to avoid to create this vector?
+  loader.load_ordered_poses_from_yaml(config.value(), "scan_poses", scan_poses_, scan_order_);
+  // loader.load_poses_from_yaml(config.value(), "place_poses", place_poses_, fixme, false);
+  loader.load_poses_from_yaml(config.value(), "place_poses", place_poses_);
+
+  motion_planner_ = motion_planner;
+  RCLCPP_INFO(get_logger(), "Workflow Planner - initiated motion_planner");
+
+  RCLCPP_INFO(get_logger(), "Motion Planner - scan_poses:");
+  for (const auto& pose : scan_poses_)
+  {
+    print_pose(pose.second);
+  }
+
+  RCLCPP_INFO(get_logger(), "Motion Planner - scan_order:");
+  for (const auto& p : scan_order_)
+  {
+    RCLCPP_WARN(get_logger(), "order: %d, sku_id: %d", p.first, p.second);
+  }
+
+  RCLCPP_INFO(get_logger(), "Motion Planner - place_poses:");
+  for (const auto& pose : place_poses_)
+  {
+    print_pose(pose.second);
+  }
+
   state_ = RobotStatus::IDLE;
 
-  srv_cli_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   action_ser_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
-  vison_srv_cli_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  vision_srv_cli_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  plan_srv_cli_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   exec_timer_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  tf_timer_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
-  exec_wps_cli_ = create_client<ExecuteWaypoints>(
-    "execute_waypoints", 
-    rmw_qos_profile_services_default,
-    srv_cli_cbg_);
+  tf_pub_timer = create_wall_timer(
+    std::chrono::seconds(1), 
+    std::bind(&WorkflowPlanner::tf_pub_cb, this),
+    tf_timer_cbg_);
 
   get_curr_pose_cli_ = create_client<GetCurrentPose>(
     "get_current_pose", 
     rmw_qos_profile_services_default,
-    srv_cli_cbg_);
+    exec_srv_cli_cbg_);
 
   get_slot_state_tri_cli_ = create_client<GetSlotStateTrigger>(
     "get_slot_state_trigger", 
     rmw_qos_profile_services_default,
-    vison_srv_cli_cbg_);
+    vision_srv_cli_cbg_);
   
   get_obj_pose_tri_cli_ = create_client<GetObjectPoseTrigger>(
     "get_object_pose_trigger", 
     rmw_qos_profile_services_default,
-    vison_srv_cli_cbg_);
+    vision_srv_cli_cbg_);
+
+  pick_plan_cli_ = create_client<PickPlan>(
+    "pick_plan", 
+    rmw_qos_profile_services_default,
+    plan_srv_cli_cbg_);
+
+  place_plan_cli_ = create_client<PlacePlan>(
+    "place_plan", 
+    rmw_qos_profile_services_default,
+    plan_srv_cli_cbg_);
+
+  RCLCPP_INFO(get_logger(), "Workflow Planner - initiated service clients");
 
   scan_sku_action_ser_ = rclcpp_action::create_server<ScanSku>(
     this,
@@ -40,6 +93,17 @@ WorkflowPlanner::WorkflowPlanner(
     rcl_action_server_get_default_options(),
     action_ser_cbg_);
 
+  replenish_action_ser_ = rclcpp_action::create_server<Replenish>(
+    this,
+    "replenish",
+    std::bind(&WorkflowPlanner::replenish_goal_cb, this, _1, _2),
+    std::bind(&WorkflowPlanner::replenish_cancel_cb, this, _1),
+    std::bind(&WorkflowPlanner::replenish_accepted, this, _1),
+    rcl_action_server_get_default_options(),
+    action_ser_cbg_);
+    
+  RCLCPP_INFO(get_logger(), "Workflow Planner - initiated action servers");
+
   RCLCPP_INFO(get_logger(), "Workflow Planner is up.");
 }
 
@@ -48,144 +112,12 @@ WorkflowPlanner::~WorkflowPlanner()
 
 }
 
-geometry_msgs::msg::Pose WorkflowPlanner::compose_pose_msg(const std::vector<double>& pose_vec)
+void WorkflowPlanner::tf_pub_cb(void)
 {
-  if (pose_vec.size() != 7) 
+  std::lock_guard<std::mutex> lock(tf_mutex_);
+
+  for (const auto& tf : tf_buf_)
   {
-    RCLCPP_ERROR(get_logger(), "Invalid dimensions for pose, vector size: %ld", pose_vec.size());
-    return geometry_msgs::msg::Pose();
+    std::apply(std::bind(&WorkflowPlanner::send_transform, this, _1, _2, _3), tf);
   }
-
-  geometry_msgs::msg::Pose msg;
-
-  msg.position.x = pose_vec[0];
-  msg.position.y = pose_vec[1];
-  msg.position.z = pose_vec[2];
-  msg.orientation.x = pose_vec[3];
-  msg.orientation.y = pose_vec[4];
-  msg.orientation.z = pose_vec[5];
-  msg.orientation.w = pose_vec[6];
-
-  return msg; 
-}
-
-bool WorkflowPlanner::are_poses_equal(
-  const geometry_msgs::msg::Pose& pose_1,
-  const geometry_msgs::msg::Pose& pose_2, 
-  double pos_thd,
-  double ori_thd)
-{
-  Eigen::Vector3d pos1(pose_1.position.x, pose_1.position.y, pose_1.position.z);
-  Eigen::Vector3d pos2(pose_2.position.x, pose_2.position.y, pose_2.position.z);
-
-  if ((pos1 - pos2).norm() > pos_thd) 
-    return false;
-  
-  // Quaternion check (normalized)
-  Eigen::Quaterniond q1(
-    pose_1.orientation.w,
-    pose_1.orientation.x,
-    pose_1.orientation.y,
-    pose_1.orientation.z
-  );
-  Eigen::Quaterniond q2(
-    pose_2.orientation.w,
-    pose_2.orientation.x,
-    pose_2.orientation.y,
-    pose_2.orientation.z
-  );
-
-  // Check if q1 and q2 represent the same rotation (allowing for sign flips)
-  return (q1.angularDistance(q2) < ori_thd);
-}
-
-template bool WorkflowPlanner::send_sync_req<robot_controller_msgs::srv::ExecuteWaypoints>(
-  rclcpp::Client<robot_controller_msgs::srv::ExecuteWaypoints>::SharedPtr,
-  const robot_controller_msgs::srv::ExecuteWaypoints::Request::SharedPtr,
-  robot_controller_msgs::srv::ExecuteWaypoints::Response::SharedPtr&,
-  const std::string) const;
-template bool WorkflowPlanner::send_sync_req<robot_controller_msgs::srv::GetCurrentPose>(
-  rclcpp::Client<robot_controller_msgs::srv::GetCurrentPose>::SharedPtr,
-  const robot_controller_msgs::srv::GetCurrentPose::Request::SharedPtr,
-  robot_controller_msgs::srv::GetCurrentPose::Response::SharedPtr&,
-  const std::string) const;
-template bool WorkflowPlanner::send_sync_req<robotic_platform_msgs::srv::GetSlotStateTrigger>(
-  rclcpp::Client<robotic_platform_msgs::srv::GetSlotStateTrigger>::SharedPtr,
-  const robotic_platform_msgs::srv::GetSlotStateTrigger::Request::SharedPtr,
-  robotic_platform_msgs::srv::GetSlotStateTrigger::Response::SharedPtr&,
-  const std::string) const;
-
-template <typename T>
-bool WorkflowPlanner::send_sync_req(
-  typename rclcpp::Client<T>::SharedPtr cli, 
-  const typename T::Request::SharedPtr request,
-  typename T::Response::SharedPtr& response,
-  const std::string srv_name) const
-{
-  if (!cli_wait_for_srv<T>(cli, srv_name))
-  {
-    RCLCPP_INFO(get_logger(), "Failed to wait service");
-    return false;
-  }
-
-  auto future = cli->async_send_request(request);
-  std::future_status status = future.wait_for(CLI_REQ_TIMEOUT);
-
-  switch (status)
-  {
-  case std::future_status::ready:
-    // Yech!!!
-    break;
-  case std::future_status::deferred:
-    RCLCPP_INFO(get_logger(), "Failed to call service %s, status: %s", srv_name.c_str(), "deferred");
-    return false;
-  case std::future_status::timeout:
-    RCLCPP_INFO(get_logger(), "Failed to call service %s, status: %s", srv_name.c_str(), "timeout");
-    return false;
-  }
-
-  response = future.get();
-
-  if (!response->success)
-  {
-    RCLCPP_INFO(get_logger(), "Service %s call failed with error: {%s}", srv_name.c_str(), response->message.c_str());
-    return false;
-  }
-
-  return true;
-}
-
-template void WorkflowPlanner::reset_req_res<robot_controller_msgs::srv::ExecuteWaypoints>(
-  robot_controller_msgs::srv::ExecuteWaypoints::Request::SharedPtr,
-  robot_controller_msgs::srv::ExecuteWaypoints::Response::SharedPtr) const;
-
-template <typename T>
-void WorkflowPlanner::reset_req_res(
-  typename T::Request::SharedPtr request,
-  typename T::Response::SharedPtr response) const
-{
-  request.reset();
-  response.reset();
-}
-
-template <typename T>
-bool WorkflowPlanner::cli_wait_for_srv(
-  typename rclcpp::Client<T>::SharedPtr cli, 
-  const std::string srv_name) const
-{
-  uint8_t retry = 0;
-
-  while (rclcpp::ok() && !cli->wait_for_service(std::chrono::milliseconds(100)))
-  {
-    if (retry >= SRV_CLI_MAX_RETIES)
-    {
-      RCLCPP_DEBUG(get_logger(), "Interrupted while waiting for the service. Exiting.");
-      return false;
-    }
-
-    RCLCPP_DEBUG(get_logger(), "%s service not available, waiting again...", srv_name.c_str());
-    retry++;
-  }
-
-  return true;
 }

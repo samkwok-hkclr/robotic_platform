@@ -29,6 +29,8 @@
 #include "robot_controller_msgs/srv/move_collision_objects.hpp"
 #include "robot_controller_msgs/srv/remove_collision_objects.hpp"
 
+#include "manipulation/planner_base.hpp"
+
 struct CollisionObject 
 {
   int id;
@@ -46,7 +48,7 @@ struct CollisionObject
 using std::placeholders::_1;
 using std::placeholders::_2;
 
-class CollisionPlanner : public rclcpp::Node
+class CollisionPlanner : public PlannerBase
 {
   using AddCollisionObjects = robot_controller_msgs::srv::AddCollisionObjects;
   using RemoveCollisionObjects = robot_controller_msgs::srv::RemoveCollisionObjects;
@@ -76,18 +78,6 @@ public:
   bool compare_id(const CollisionObject &a, const CollisionObject &b);
   void sort_collision_objects(void);
 
-  template <typename T>
-  bool send_req(
-    typename rclcpp::Client<T>::SharedPtr cli, 
-    const typename T::Request::SharedPtr request,
-    typename T::Response::SharedPtr& response,
-    const std::string srv_name) const;
-
-  template <typename T>
-  bool cli_wait_for_srv(
-    typename rclcpp::Client<T>::SharedPtr cli, 
-    const std::string srv_name) const;
-
 private:
   std::mutex mutex_;
 
@@ -108,8 +98,6 @@ private:
   rclcpp::Client<MoveCollisionObjects>::SharedPtr move_col_obj_cli_;
   rclcpp::Client<GetCollisionObjectsFromScene>::SharedPtr get_col_obj_from_secne_cli_;
 
-  constexpr static uint8_t SRV_CLI_MAX_RETIES = 5;
-  constexpr static std::chrono::duration CLI_REQ_TIMEOUT = std::chrono::milliseconds(1000);
 };
 
 

@@ -20,6 +20,10 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(std_srvs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(moveit_msgs REQUIRED)
@@ -37,11 +41,24 @@ include_directories(
 
 add_executable(manipulation_server 
   src/manipulation/main.cpp
+  src/manipulation/planner_base.cpp
+  src/manipulation/node_base.cpp
+
+  src/manipulation/end_effector_ctrl/vacuum_gripper_ctlr.cpp
+
   src/manipulation/collision_planner/collision_planner.cpp
 
-  src/manipulation/workflow_planner/workflow_planner.cpp
-  src/manipulation/workflow_planner/action_server/scan_sku.cpp
+  src/manipulation/motion_planner/motion_planner.cpp
+  src/manipulation/motion_planner/motion_impl.cpp
+  src/manipulation/motion_planner/motion.cpp
 
+  src/manipulation/workflow_planner/workflow_planner.cpp
+  src/manipulation/workflow_planner/utils.cpp
+  src/manipulation/workflow_planner/action_server/scan_sku.cpp
+  src/manipulation/workflow_planner/action_server/replenish.cpp
+
+  src/manipulation/action_planner/action_planner.cpp
+  src/manipulation/action_planner/service_server/plan.cpp
 )
 target_include_directories(manipulation_server PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -50,8 +67,14 @@ target_include_directories(manipulation_server PUBLIC
 ament_target_dependencies(manipulation_server
   rclcpp
   rclcpp_action
-  sensor_msgs
 
+  tf2
+  tf2_ros
+  
+  std_msgs
+  std_srvs
+
+  sensor_msgs
   geometry_msgs
   moveit_msgs
 
@@ -68,12 +91,6 @@ target_compile_features(manipulation_server PUBLIC c_std_99 cxx_std_17)  # Requi
 install(TARGETS 
   manipulation_server
   DESTINATION lib/${PROJECT_NAME}
-)
-
-install(DIRECTORY
-  launch
-  params
-  DESTINATION share/${PROJECT_NAME}/
 )
 
 if(BUILD_TESTING)
