@@ -3,8 +3,7 @@
 bool MotionPlanner::try_to_pick(
   const Pose& pre_pick_pose, 
   const std::vector<Pose>& pick_poses, 
-  const std::chrono::milliseconds leak_check_duration,
-  const uint8_t max_retries)
+  const std::chrono::milliseconds leak_check_duration)
 {
   (void) pre_pick_pose;
   std::atomic<bool> start_leak_valid{false};
@@ -21,14 +20,14 @@ bool MotionPlanner::try_to_pick(
 
   auto leak_sub = create_subscription<Empty>("leak_warning", 10, leak_cb);
 
-  for (uint8_t attempt = 1; attempt <= max_retries; ++attempt)
+  for (uint8_t attempt = 1; attempt <= max_pick_attempt_; ++attempt)
   {
-    RCLCPP_INFO(get_logger(), "Pick attempt %d/%d", attempt, max_retries);
+    RCLCPP_INFO(get_logger(), "Pick attempt %d/%d", attempt, max_pick_attempt_);
 
     if (!gripper_action(true))
       return false;
     
-    if (!move_to(pick_poses, 5.0)) 
+    if (!move_to(pick_poses, 3.0)) 
     {
       RCLCPP_ERROR(get_logger(), "Movement failed on attempt %d", attempt);
       return false;
@@ -52,7 +51,7 @@ bool MotionPlanner::try_to_pick(
       start_leak_valid.store(false);
       leak_detected.store(false); // Reset for next attempt
 
-      std::this_thread::sleep_for(std::chrono::milliseconds(200));
+      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
       continue;
     }
 

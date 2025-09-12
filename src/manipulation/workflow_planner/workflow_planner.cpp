@@ -5,10 +5,35 @@ WorkflowPlanner::WorkflowPlanner(
   std::shared_ptr<MotionPlanner> motion_planner)
 : PlannerBase("workflow_planner", options)
 {
+  declare_parameter<double>("valid_z_threshold", 0.01);
+  declare_parameter<int>("max_pick_attampt", 0);
+  declare_parameter<int>("max_scan_attempt", 0);
+  declare_parameter<double>("re_scan_translation", 0.05);
+  declare_parameter<double>("place_offset", 0.02);
   declare_parameter<std::string>("poses_file", "");
+  declare_parameter<std::vector<double>>("eef_to_left_camera", {0.0});
 
   std::string poses_file;
+  get_parameter("valid_z_threshold", valid_z_threshold_);
+  get_parameter("max_pick_attampt", max_pick_attampt_);
+  get_parameter("max_scan_attempt", max_scan_attempt_);
+  get_parameter("re_scan_translation", re_scan_translation_);
+  get_parameter("place_offset", place_offset_);
   get_parameter("poses_file", poses_file);
+  std::vector<double> tmp = get_parameter("eef_to_left_camera").as_double_array();
+
+  if (tmp.size() == 7)
+  {
+    g_tcp__left_cam_ = get_g(tmp[0], tmp[1], tmp[2], tmp[3], tmp[4], tmp[5], tmp[6]);
+    RCLCPP_WARN(get_logger(), "g_tcp__left_cam_ got from config yaml");
+  }
+  else
+  {
+    g_tcp__left_cam_ = get_g(0, 0, 0, 0, 0, 0);
+    RCLCPP_WARN(get_logger(), "g_tcp__left_cam_ does not define");
+  }
+
+  print_g(g_tcp__left_cam_);
 
   PosesLoader loader;
   std::optional<YAML::Node> config = loader.parse_yaml(poses_file);
@@ -53,7 +78,7 @@ WorkflowPlanner::WorkflowPlanner(
   tf_timer_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   tf_pub_timer = create_wall_timer(
-    std::chrono::seconds(1), 
+    std::chrono::milliseconds(20), 
     std::bind(&WorkflowPlanner::tf_pub_cb, this),
     tf_timer_cbg_);
 
@@ -83,6 +108,15 @@ WorkflowPlanner::WorkflowPlanner(
     plan_srv_cli_cbg_);
 
   RCLCPP_INFO(get_logger(), "Workflow Planner - initiated service clients");
+
+  pick_up_action_ser_ = rclcpp_action::create_server<PickUp>(
+    this,
+    "pick_up",
+    std::bind(&WorkflowPlanner::pick_up_goal_cb, this, _1, _2),
+    std::bind(&WorkflowPlanner::pick_up_cancel_cb, this, _1),
+    std::bind(&WorkflowPlanner::pick_up_accepted, this, _1),
+    rcl_action_server_get_default_options(),
+    action_ser_cbg_);
 
   scan_sku_action_ser_ = rclcpp_action::create_server<ScanSku>(
     this,

@@ -5,7 +5,6 @@ rclcpp_action::GoalResponse WorkflowPlanner::scan_sku_goal_cb(
   std::shared_ptr<const ScanSku::Goal> goal)
 {
   (void)uuid;
-  std::unique_lock<std::mutex> lock(mutex_, std::defer_lock);
 
   if (state_ != RobotStatus::IDLE)
   {
@@ -66,77 +65,39 @@ void WorkflowPlanner::scan_sku_execution(const std::shared_ptr<GoalHandlerScanSk
   };
   
   rclcpp::TimerBase::SharedPtr pub_fb_timer = create_wall_timer(std::chrono::seconds(1), pub_fb, exec_timer_cbg_);
+  clear_tf_buf();
 
-  if (!motion_planner_->move_to_pre_scan_pose(80.0))
+  if (!motion_planner_->move_to_scan_pose(25.0))
   {
     goal_handle->abort(result);
     return;
   }
 
-  for (const auto &sku_pair : scan_order_) 
-  {
-    const int target_sku_id = std::get<1>(sku_pair);
-    RCLCPP_INFO(get_logger(), "target_sku_id: %d", target_sku_id);
-
-    if (scan_poses_.find(target_sku_id) == scan_poses_.end()) 
-    {
-      RCLCPP_ERROR(get_logger(), "Pose of target_sku_id [%d] not found.", target_sku_id);
-      continue;
-    }
-
-    Pose target_pose = scan_poses_[target_sku_id];
-    if (!motion_planner_->move_to(target_pose, 80.0))
-    {
-      goal_handle->abort(result);
-      return;
-    }
-
-    std::optional<Pose> curr_pose = get_curr_pose("tcp");
-    if (!curr_pose.has_value())
-    {
-      goal_handle->abort(result);
-      return;
-    }
-
-    if (are_poses_closed(*curr_pose, target_pose))
-    {
-      RCLCPP_INFO(get_logger(), "scanning sku: [%d]", target_sku_id);
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-      auto get_slot_state_request = std::make_shared<GetSlotStateTrigger::Request>();
-      get_slot_state_request->camera_id = goal->camera_id;
-      get_slot_state_request->target_object_id = target_sku_id;
-      GetSlotStateTrigger::Response::SharedPtr get_slot_state_response;
-      if (!(send_sync_req<GetSlotStateTrigger>(get_slot_state_tri_cli_, std::move(get_slot_state_request), get_slot_state_response) && get_slot_state_response))
-      {
-        RCLCPP_ERROR(get_logger(), "Sent GetCurrentPose request failed");
-        break;
-      }
-
-      RCLCPP_INFO(get_logger(), "SKU ID: %d, remain_qty: [%d]", target_sku_id, get_slot_state_response->remain_qty);
-    }
-    else
-    {
-      RCLCPP_ERROR(get_logger(), "It is not close!!!");
-    }
-  }
-
-  if (!motion_planner_->move_to_pre_scan_pose(70.0f))
+  RCLCPP_WARN(get_logger(), "start to scan <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
+  std::optional<std::vector<ObjectPose>> obj_poses = try_to_scan(goal->sku_id, goal->camera_id);
+  if (!obj_poses.has_value())
   {
     goal_handle->abort(result);
+    RCLCPP_INFO(get_logger(), "have no value");
     return;
   }
 
-  if (!motion_planner_->move_to_home_pose(80.0f))
+  std::vector<ObjectPose>& poses_in_camera = obj_poses.value();
+  RCLCPP_INFO(get_logger(), "pose length: %ld", poses_in_camera.size());
+
+  std::optional<Pose> obj_pose = extract_object_pose(poses_in_camera);
+  if (!obj_pose.has_value())
   {
     goal_handle->abort(result);
+    RCLCPP_INFO(get_logger(), "obj_pose have no value");
     return;
   }
 
   if (rclcpp::ok()) 
   {
+    clear_tf_buf();
+    result->success = true;
     pub_fb_timer->cancel();
-    result->info = {};
     goal_handle->succeed(result);
 
     RCLCPP_INFO(this->get_logger(), "Goal succeeded");

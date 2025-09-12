@@ -1,5 +1,27 @@
 #include "manipulation/workflow_planner/workflow_planner.hpp"
 
+std::optional<std::vector<robotic_platform_msgs::msg::ObjectPose>> WorkflowPlanner::get_obj_poses(
+  const uint32_t sku_id,
+  const uint8_t camera_id)
+{
+  auto request = std::make_shared<GetObjectPoseTrigger::Request>();
+  request->target_object_id = sku_id;
+  request->camera_id = camera_id;
+
+  GetObjectPoseTrigger::Response::SharedPtr response;
+  if (!(send_sync_req<GetObjectPoseTrigger>(get_obj_pose_tri_cli_, std::move(request), response) && response))
+  {
+    RCLCPP_ERROR(get_logger(), "Sent GetObjectPoseTrigger request failed");
+    return std::nullopt;
+  }
+
+  if (!response->success)
+    return std::nullopt;
+
+  RCLCPP_WARN(get_logger(), "OK!");
+  return std::make_optional(std::move(response->object_poses));
+}
+
 std::optional<robotic_platform_msgs::msg::PickPlanResult> WorkflowPlanner::get_pick_plan(const Pose& object_pose)
 {
   auto request = std::make_shared<PickPlan::Request>();
@@ -77,5 +99,15 @@ void WorkflowPlanner::clear_tf_buf()
   std::lock_guard<std::mutex> lock(tf_mutex_);
 
   tf_buf_.clear();
+}
+
+std::string WorkflowPlanner::get_flat_link(const uint8_t rack_id, const uint8_t shelf_level)
+{
+  return "rack_" + std::to_string(rack_id) + "_shelf_" + std::to_string(shelf_level) + "_flat_link";
+}
+
+std::string WorkflowPlanner::get_place_link(const uint8_t table_id, const uint8_t index)
+{
+  return "table_" + std::to_string(table_id) + "_place_" + std::to_string(index) + "_link";
 }
 

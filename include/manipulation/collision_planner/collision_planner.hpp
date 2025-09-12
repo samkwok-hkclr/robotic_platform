@@ -29,7 +29,7 @@
 #include "robot_controller_msgs/srv/move_collision_objects.hpp"
 #include "robot_controller_msgs/srv/remove_collision_objects.hpp"
 
-#include "manipulation/planner_base.hpp"
+#include "planner_base.hpp"
 
 struct CollisionObject 
 {

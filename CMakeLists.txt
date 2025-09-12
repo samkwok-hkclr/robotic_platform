@@ -39,42 +39,59 @@ include_directories(
   ${YAML_CPP_INCLUDEDIR}
 )
 
-add_executable(manipulation_server 
-  src/manipulation/main.cpp
-  src/manipulation/planner_base.cpp
-  src/manipulation/node_base.cpp
+set(common_files
+  src/planner_base.cpp
+  src/tf_broadcaster.cpp
+)
 
+set(manager_files
+  src/node_base.cpp
+  src/manager/manager.cpp
+)
+
+set(manipulation_files
   src/manipulation/end_effector_ctrl/vacuum_gripper_ctlr.cpp
-
   src/manipulation/collision_planner/collision_planner.cpp
-
   src/manipulation/motion_planner/motion_planner.cpp
   src/manipulation/motion_planner/motion_impl.cpp
   src/manipulation/motion_planner/motion.cpp
-
   src/manipulation/workflow_planner/workflow_planner.cpp
+  src/manipulation/workflow_planner/transformation.cpp
   src/manipulation/workflow_planner/utils.cpp
+  src/manipulation/workflow_planner/strategy/pick.cpp
+  src/manipulation/workflow_planner/strategy/scan.cpp
+  src/manipulation/workflow_planner/action_server/pick_up.cpp
   src/manipulation/workflow_planner/action_server/scan_sku.cpp
   src/manipulation/workflow_planner/action_server/replenish.cpp
-
   src/manipulation/action_planner/action_planner.cpp
   src/manipulation/action_planner/service_server/plan.cpp
 )
-target_include_directories(manipulation_server PUBLIC
+
+add_executable(platform_server 
+  src/node_base.cpp
+  src/main.cpp
+
+  ${common_files}
+  ${manager_files}
+  ${manipulation_files}
+)
+target_include_directories(platform_server PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
-ament_target_dependencies(manipulation_server
+ament_target_dependencies(platform_server
   rclcpp
   rclcpp_action
 
   tf2
   tf2_ros
+  tf2_geometry_msgs
   
   std_msgs
   std_srvs
-
+  
   sensor_msgs
+
   geometry_msgs
   moveit_msgs
 
@@ -84,12 +101,12 @@ ament_target_dependencies(manipulation_server
   robot_controller_msgs
   robotic_platform_msgs
 )
-target_link_libraries(manipulation_server 
+target_link_libraries(platform_server 
   ${YAML_CPP_LIBRARIES})
-target_compile_features(manipulation_server PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+target_compile_features(platform_server PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
 install(TARGETS 
-  manipulation_server
+  platform_server
   DESTINATION lib/${PROJECT_NAME}
 )
 

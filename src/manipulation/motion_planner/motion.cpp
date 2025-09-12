@@ -2,14 +2,7 @@
 
 bool MotionPlanner::pick(const PickPlanResult& plan, const float speed)
 {
-  (void) speed;
-
-  if (!move_to_before_pick_poses(90.0))
-  {
-    return false;
-  }
-  
-  if (!move_to(plan.pre_pick_pose, 90.0))
+  if (!move_to(plan.pre_pick_pose, speed))
   {
     return false;
   }
@@ -20,7 +13,7 @@ bool MotionPlanner::pick(const PickPlanResult& plan, const float speed)
   }
   RCLCPP_WARN(get_logger(), "Picked the item");
 
-  if (!move_to(plan.lifted_poses, 15.0))
+  if (!move_to(plan.lifted_poses, speed * 0.75f))
   {
     return false;
   }
@@ -33,19 +26,13 @@ bool MotionPlanner::move_from_pick_to_place(const float speed)
 {
   (void) speed;
 
-  if (!move_to_lifted_pick_poses(15.0))
+  if (!move_to_lifted_pick_poses(speed))
   {
     return false;
   }
   RCLCPP_WARN(get_logger(), "Lifted the pick pose");
 
-  if (!move_to_middle_pose(10.0))
-  {
-    return false;
-  }
-  RCLCPP_WARN(get_logger(), "Moved to middle pose");
-
-  if (!move_to_before_place_poses(10.0))
+  if (!move_to_before_place_poses(speed))
   {
     return false;
   }
@@ -56,9 +43,7 @@ bool MotionPlanner::move_from_pick_to_place(const float speed)
 
 bool MotionPlanner::place(const PlacePlanResult& plan, const float speed)
 {
-  (void) speed;
-
-  if (!move_to(plan.pre_place_pose, 15.0))
+  if (!move_to(plan.pre_place_pose, speed))
   {
     return false;
   }
@@ -70,17 +55,11 @@ bool MotionPlanner::place(const PlacePlanResult& plan, const float speed)
   }
   RCLCPP_WARN(get_logger(), "Placed the item");
 
-  if (!move_to(plan.lifted_poses, 60.0))
+  if (!move_to(plan.lifted_poses, speed * 0.75f))
   {
     return false;
   }
   RCLCPP_WARN(get_logger(), "Lifted the place pose");
-
-  if (!move_to_pre_place_pose(90.0))
-  {
-    return false;
-  }
-  RCLCPP_WARN(get_logger(), "Moved to pre place pose");
 
   return true;
 }
@@ -98,6 +77,11 @@ bool MotionPlanner::move_to_home_pose(const float speed)
 bool MotionPlanner::move_to_middle_pose(const float speed)
 {
   return move_to(middle_pose_, speed);
+}
+
+bool MotionPlanner::move_to_scan_pose(const float speed)
+{
+  return move_to(scan_pose_, speed);
 }
 
 bool MotionPlanner::move_to_pre_scan_pose(const float speed)

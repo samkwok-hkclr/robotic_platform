@@ -55,53 +55,6 @@ void WorkflowPlanner::replenish_execution(const std::shared_ptr<GoalHandlerReple
   
   auto result = std::make_shared<Replenish::Result>();
 
-  push_tf_buf(std::make_tuple(goal->object_pose, "base_footprint", "object_pose"));
-
-  std::optional<PickPlanResult> pick_plan_result = get_pick_plan(goal->object_pose);
-  if (!pick_plan_result.has_value())
-  {
-    goal_handle->abort(result);
-    return;
-  }
-
-  push_tf_buf(std::make_tuple(pick_plan_result.value().pre_pick_pose, "base_footprint", "pre_pick_pose"));
-  auto& pick_poses = pick_plan_result.value().pick_poses;
-  std::for_each(pick_poses.begin(), pick_poses.end(), [this, i = 0](auto& pose) mutable {
-      push_tf_buf(std::make_tuple(pose, "base_footprint", "pick_poses_" + std::to_string(i++)));
-    });
-
-  if (!motion_planner_->pick(pick_plan_result.value(), 90.0))
-  {
-    goal_handle->abort(result);
-    return;
-  }
-
-  if (!motion_planner_->move_from_pick_to_place(15.0))
-  {
-    goal_handle->abort(result);
-    return;
-  }
-
-  std::optional<PlacePlanResult> place_plan_result = get_place_plan(place_poses_[goal->sku_id]);
-  if (!place_plan_result.has_value())
-  {
-    goal_handle->abort(result);
-    return;
-  }
-
-  if (!motion_planner_->place(place_plan_result.value(), 15.0))
-  {
-    goal_handle->abort(result);
-    return;
-  }
-
-  if (!motion_planner_->move_to_home_pose(90.0))
-  {
-    goal_handle->abort(result);
-    return;
-  }
-  RCLCPP_WARN(get_logger(), "Moved to home pose");
-
   if (rclcpp::ok()) 
   {
     clear_tf_buf();

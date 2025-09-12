@@ -5,13 +5,16 @@ CollisionPlanner::CollisionPlanner(
 : PlannerBase("collision_planner", options)
 {
   declare_parameter<bool>("sim", true);
+  declare_parameter<bool>("import_from_file", false);
   declare_parameter<std::string>("collision_objects_file", "");
 
   std::string file;
+  bool import_from_file = false;
   get_parameter("sim", sim_);
+  get_parameter("import_from_file", import_from_file);
   get_parameter("collision_objects_file", file);
 
-  if (!get_col_obj_form_file(file))
+  if (import_from_file && !get_col_obj_form_file(file))
   {
     rclcpp::shutdown();
     return;
@@ -185,7 +188,7 @@ bool CollisionPlanner::get_col_obj_from_scene(std::vector<std::string>& object_i
   }
   
   if (response->id_map.size() == 0)
-    RCLCPP_INFO(get_logger(), "id_map size: %ld", response->id_map.size());
+    RCLCPP_DEBUG(get_logger(), "id_map size: %ld", response->id_map.size());
   else
   {
     for (const auto& instance : response->id_map)

@@ -19,7 +19,7 @@
 #include "sensor_msgs/msg/temperature.hpp"
 #include "sensor_msgs/msg/range.hpp"
 
-#include "manipulation/node_base.hpp"
+#include "node_base.hpp"
 #include "vacuum_gripper_status.hpp"
 
 using std::placeholders::_1;

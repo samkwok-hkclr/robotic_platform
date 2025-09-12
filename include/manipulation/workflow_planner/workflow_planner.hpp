@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <functional>
 #include <future>
 #include <memory>
@@ -12,7 +13,6 @@
 #include <utility>
 #include <unordered_map>
 
-// #include <yaml-cpp/yaml.h>
 #include <Eigen/Geometry>
 
 #include "rclcpp/rclcpp.hpp"
@@ -20,6 +20,7 @@
 
 #include "geometry_msgs/msg/pose.hpp"
 
+#include "robotic_platform_msgs/action/pick_up.hpp"
 #include "robotic_platform_msgs/action/scan_sku.hpp"
 #include "robotic_platform_msgs/action/replenish.hpp"
 
@@ -29,6 +30,7 @@
 #include "robotic_platform_msgs/msg/replenish_quantity.hpp"
 #include "robotic_platform_msgs/msg/robot_status.hpp"
 #include "robotic_platform_msgs/msg/localization_param.hpp"
+#include "robotic_platform_msgs/msg/object_pose.hpp"
 
 #include "robotic_platform_msgs/srv/get_slot_state_trigger.hpp"
 #include "robotic_platform_msgs/srv/get_object_pose_trigger.hpp"
@@ -37,7 +39,7 @@
 
 #include "robot_controller_msgs/srv/get_current_pose.hpp"
 
-#include "manipulation/planner_base.hpp"
+#include "planner_base.hpp"
 #include "manipulation/poses_loader.hpp"
 #include "manipulation/motion_planner/motion_planner.hpp"
 
@@ -48,6 +50,7 @@ using std::placeholders::_3;
 class WorkflowPlanner : public PlannerBase
 {
   using Pose = geometry_msgs::msg::Pose;
+  using TransformStamped = geometry_msgs::msg::TransformStamped;
 
   using GetCurrentPose = robot_controller_msgs::srv::GetCurrentPose;
 
@@ -57,15 +60,18 @@ class WorkflowPlanner : public PlannerBase
   using ReplenishQuantity = robotic_platform_msgs::msg::ReplenishQuantity;
   using RobotStatus = robotic_platform_msgs::msg::RobotStatus;
   using LocalizationParam = robotic_platform_msgs::msg::LocalizationParam;
+  using ObjectPose = robotic_platform_msgs::msg::ObjectPose;
 
   using GetSlotStateTrigger = robotic_platform_msgs::srv::GetSlotStateTrigger;
   using GetObjectPoseTrigger = robotic_platform_msgs::srv::GetObjectPoseTrigger;
   using PickPlan = robotic_platform_msgs::srv::PickPlan;
   using PlacePlan = robotic_platform_msgs::srv::PlacePlan;
 
+  using PickUp = robotic_platform_msgs::action::PickUp;
   using ScanSku = robotic_platform_msgs::action::ScanSku;
   using Replenish = robotic_platform_msgs::action::Replenish;
 
+  using GoalHandlerPickUp = rclcpp_action::ServerGoalHandle<PickUp>;
   using GoalHandlerScanSku = rclcpp_action::ServerGoalHandle<ScanSku>;
   using GoalHandlerReplenish = rclcpp_action::ServerGoalHandle<Replenish>;
   
@@ -79,11 +85,28 @@ public:
   void push_tf_buf(const std::tuple<Pose, std::string, std::string>& tf);
   void clear_tf_buf();
 
+  std::string get_flat_link(const uint8_t rack_id, const uint8_t shelf_level);
+  std::string get_place_link(const uint8_t table_id, const uint8_t index);
+
+  bool try_to_pick_up(const uint32_t sku_id, const uint8_t camera_id);
+  std::optional<std::vector<ObjectPose>> try_to_scan(const uint32_t sku_id, const uint8_t camera_id);
+
+  std::optional<Pose> extract_object_pose(const std::vector<ObjectPose>& poses_in_camera);
+
+  std::optional<std::vector<ObjectPose>> get_obj_poses(const uint32_t sku_id, const uint8_t camera_id);
   std::optional<PickPlanResult> get_pick_plan(const Pose& object_pose);
   std::optional<PlacePlanResult> get_place_plan(const Pose& place_pose);
   std::optional<Pose> get_curr_pose(const std::string& joint_name);
 
   void tf_pub_cb(void);
+
+  rclcpp_action::GoalResponse pick_up_goal_cb(
+    const rclcpp_action::GoalUUID & uuid, 
+    std::shared_ptr<const PickUp::Goal> goal);
+  rclcpp_action::CancelResponse pick_up_cancel_cb(
+    const std::shared_ptr<GoalHandlerPickUp> goal_handle);
+  void pick_up_accepted(const std::shared_ptr<GoalHandlerPickUp> goal_handle);
+  void pick_up_execution(const std::shared_ptr<GoalHandlerPickUp> goal_handle);
 
   rclcpp_action::GoalResponse scan_sku_goal_cb(
     const rclcpp_action::GoalUUID & uuid, 
@@ -103,7 +126,14 @@ public:
 
 private:
   std::mutex mutex_;
+
   std::mutex tf_mutex_;
+  
+  std::vector<std::tuple<Pose, std::string, std::string>> tf_buf_;
+
+  tf2::Transform g_tcp__left_cam_;
+
+  const std::string object_pose_ = "object_pose";
 
   std::unordered_map<int, Pose> scan_poses_; // sku_id, pose
   std::vector<std::pair<int, int>> scan_order_; // order, sku_id
@@ -111,9 +141,12 @@ private:
 
   std::shared_ptr<MotionPlanner> motion_planner_;
   
+  uint8_t max_pick_attampt_;
+  float valid_z_threshold_;
+  uint16_t max_scan_attempt_;
+  float re_scan_translation_;
+  float place_offset_;
   uint8_t state_ = 0; // FIXME
-
-  std::vector<std::tuple<Pose, std::string, std::string>> tf_buf_;
   
   rclcpp::CallbackGroup::SharedPtr action_ser_cbg_;
   rclcpp::CallbackGroup::SharedPtr vision_srv_cli_cbg_;
@@ -132,6 +165,7 @@ private:
   rclcpp::Client<PickPlan>::SharedPtr pick_plan_cli_;
   rclcpp::Client<PlacePlan>::SharedPtr place_plan_cli_;
 
+  rclcpp_action::Server<PickUp>::SharedPtr pick_up_action_ser_;
   rclcpp_action::Server<ScanSku>::SharedPtr scan_sku_action_ser_;
   rclcpp_action::Server<Replenish>::SharedPtr replenish_action_ser_;
 

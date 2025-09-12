@@ -5,10 +5,12 @@ MotionPlanner::MotionPlanner(
   std::shared_ptr<VacuumGripperCtlr> gripper_node)
 : PlannerBase("motion_planner", options)
 {
+  declare_parameter<int>("max_pick_attempt", 0);
   declare_parameter<std::string>("poses_file", "");
   declare_parameter<std::vector<std::string>>("move_to_srv_names");
 
   std::string poses_file;
+  get_parameter("max_pick_attempt", max_pick_attempt_);
   get_parameter("poses_file", poses_file);
   move_to_srv_names_ = get_parameter("move_to_srv_names").as_string_array();
 
@@ -23,12 +25,14 @@ MotionPlanner::MotionPlanner(
   pose_actions = {
     {"home_pose", std::bind(&MotionPlanner::move_to_home_pose, this, _1)},
     {"middle_pose", std::bind(&MotionPlanner::move_to_middle_pose, this, _1)},
+    {"scan_pose", std::bind(&MotionPlanner::move_to_scan_pose, this, _1)},
     {"pre_pick_pose", std::bind(&MotionPlanner::move_to_pre_pick_pose, this, _1)},
     {"pre_place_pose", std::bind(&MotionPlanner::move_to_pre_place_pose, this, _1)}
   };
 
   loader.load_pose_from_yaml(config.value(), "home_pose", home_pose_);
   loader.load_pose_from_yaml(config.value(), "middle_pose", middle_pose_);
+  loader.load_pose_from_yaml(config.value(), "scan_pose", scan_pose_);
   loader.load_pose_from_yaml(config.value(), "pre_scan_pose", pre_scan_pose_);
   loader.load_pose_from_yaml(config.value(), "pre_pick_pose", pre_pick_pose_);
   loader.load_pose_from_yaml(config.value(), "pre_place_pose", pre_place_pose_);
@@ -41,6 +45,8 @@ MotionPlanner::MotionPlanner(
   print_pose(home_pose_);
   RCLCPP_INFO(get_logger(), "Motion Planner - middle_pose:");
   print_pose(middle_pose_);
+  RCLCPP_INFO(get_logger(), "Motion Planner - scan_pose:");
+  print_pose(scan_pose_);
   RCLCPP_INFO(get_logger(), "Motion Planner - pre_pick_pose:");
   print_pose(pre_pick_pose_);
   RCLCPP_INFO(get_logger(), "Motion Planner - pre_place_pose:");
@@ -65,15 +71,17 @@ MotionPlanner::MotionPlanner(
     "execute_waypoints", 
     rmw_qos_profile_services_default,
     exec_srv_cli_cbg_);
-
+  
+  move_to_srv_.reserve(move_to_srv_names_.size());
   for (const auto& srv_name : move_to_srv_names_)
   {
-    move_to_srv_.push_back(
+    move_to_srv_.push_back(std::move(
       create_service<Trigger>(
         "move_to_" + srv_name, 
         std::bind(&MotionPlanner::move_to_cb, this, _1, _2, srv_name),
         rmw_qos_profile_services_default,
         srv_ser_cbg_)
+      )
     );
   }
 
@@ -90,20 +98,21 @@ MotionPlanner::~MotionPlanner()
 void MotionPlanner::move_to_cb(
   const std::shared_ptr<Trigger::Request> request, 
   std::shared_ptr<Trigger::Response> response,
-  const std::string& pose)
+  std::string_view pose)
 {
   (void) request;
+  const float default_speed = 20.0f;
 
   if (auto it = pose_actions.find(pose); it != pose_actions.end()) 
   {
-    if (it->second(40.0)) 
+    if (it->second(default_speed)) 
     {
-      RCLCPP_INFO(get_logger(), "Successfully moved to pose '%s' (speed: %.1f)", pose.c_str(), 40.0);
+      RCLCPP_INFO(get_logger(), "Successfully moved to pose '%s' (speed: %.1f)", pose.data(), default_speed);
       response->success = true;
     }
     else
     {
-      RCLCPP_ERROR(get_logger(), "Failed to move to pose '%s' (speed: %.1f)", pose.c_str(), 40.0);
+      RCLCPP_ERROR(get_logger(), "Failed to move to pose '%s' (speed: %.1f)", pose.data(), default_speed);
     }
   } 
   else 
@@ -112,13 +121,12 @@ void MotionPlanner::move_to_cb(
     for (const auto& pair : pose_actions) 
     {
       if (!available_poses.empty()) 
-      {
         available_poses += ", ";
-      }
-      available_poses += "'" + pair.first + "'";
+      
+      available_poses += "'" + std::string(pair.first) + "'";
     }
-    // can I use the it to get the pose name?
-    RCLCPP_ERROR(get_logger(), "Unknown pose requested: '%s' - Available poses: [%s]", pose.c_str(), available_poses.c_str());
+    
+    RCLCPP_ERROR(get_logger(), "Unknown pose requested: '%s' - Available poses: [%s]", pose.data(), available_poses.c_str());
     response->success = false;
     response->message = "Unknown pose requested";
   }  

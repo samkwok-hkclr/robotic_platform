@@ -18,6 +18,13 @@ ActionPlanner::ActionPlanner(
   get_parameter("post_pick_back_offset", post_pick_back_offset_);
   get_parameter("post_place_down_offset", post_place_down_offset_);
 
+  tf_timer_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+  tf_pub_timer = create_wall_timer(
+    std::chrono::milliseconds(100), 
+    std::bind(&ActionPlanner::tf_pub_cb, this),
+    tf_timer_cbg_);
+
   srv_ser_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   pick_plan_srv_ = create_service<PickPlan>(
@@ -38,4 +45,16 @@ ActionPlanner::ActionPlanner(
 ActionPlanner::~ActionPlanner()
 {
 
+}
+
+
+void ActionPlanner::tf_pub_cb(void)
+{
+  // For future use 
+  std::lock_guard<std::mutex> lock(tf_mutex_);
+
+  for (const auto& tf : tf_buf_)
+  {
+    std::apply(std::bind(&ActionPlanner::send_transform, this, _1, _2, _3), tf);
+  }
 }

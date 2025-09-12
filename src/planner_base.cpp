@@ -1,4 +1,4 @@
-#include "manipulation/planner_base.hpp"
+#include "planner_base.hpp"
 
 PlannerBase::PlannerBase(
   std::string node_name, 
@@ -6,6 +6,82 @@ PlannerBase::PlannerBase(
 : NodeBase(node_name, options)
 {
   tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
+  tf_static_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
+  
+  tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
+  transform_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+}
+
+tf2::Transform PlannerBase::get_g(const Pose& pose)
+{
+  const auto& [px, py, pz] = pose.position;
+  const auto& [qx, qy, qz, qw] = pose.orientation;
+
+  tf2::Transform g;
+  tf2::Quaternion q(qx, qy, qz, qw);
+
+  g.setOrigin(tf2::Vector3(px, py, pz));
+  g.setRotation(q);
+
+  RCLCPP_DEBUG(get_logger(), "px = %f, py= %f, pz = %f, qx = %f, qy = %f, qz = %f, qw = %f", 
+    px, py, pz, qx, qy, qz, qw); 
+  return g;
+}
+
+tf2::Transform PlannerBase::get_g(double px, double py, double pz, double roll, double pitch, double yaw)
+{
+  tf2::Transform g;
+  tf2::Quaternion q;
+
+  g.setOrigin(tf2::Vector3(px, py, pz));
+  q.setRPY(roll, pitch, yaw);
+  q.normalize();
+
+  g.setRotation(q);
+
+  RCLCPP_DEBUG(get_logger(), "px = %f, py= %f, pz = %f, roll = %f, pitch = %f, yaw = %f", 
+    px, py, pz, roll, pitch, yaw);  
+  return g;
+}
+
+tf2::Transform PlannerBase::get_g(double px, double py, double pz, double qx, double qy, double qz, double qw)
+{
+  tf2::Transform g;
+  tf2::Quaternion q(qx, qy, qz, qw);
+
+  g.setOrigin(tf2::Vector3(px, py, pz));
+  g.setRotation(q);
+
+  RCLCPP_DEBUG(get_logger(), "px = %f, py= %f, pz = %f, qx = %f, qy = %f, qz = %f, qw = %f", 
+    px, py, pz, qx, qy, qz, qw);  
+  return g;
+}
+
+void PlannerBase::print_g(const tf2::Transform& g) const
+{
+  RCLCPP_WARN(get_logger(), "px = %f, py= %f, pz = %f, qx = %f, qy = %f, qz = %f, qw = %f",
+    g.getOrigin().getX(),
+    g.getOrigin().getY(),
+    g.getOrigin().getZ(),
+    g.getRotation().getX(),
+    g.getRotation().getY(),
+    g.getRotation().getZ(),
+    g.getRotation().getW());
+}
+
+geometry_msgs::msg::Pose PlannerBase::cvt_g_to_pose(const tf2::Transform& g) const
+{
+  Pose msg;
+
+  msg.position.x = g.getOrigin().getX();
+  msg.position.y = g.getOrigin().getY();
+  msg.position.z = g.getOrigin().getZ();
+  msg.orientation.x = g.getRotation().getX();
+  msg.orientation.y = g.getRotation().getY();
+  msg.orientation.z = g.getRotation().getZ();
+  msg.orientation.w = g.getRotation().getW();
+
+  return msg;
 }
 
 void PlannerBase::pose_translation(Pose::SharedPtr pose, float x, float y, float z)
@@ -132,4 +208,28 @@ void PlannerBase::send_transform(
   tf_broadcaster_->sendTransform(t);
 }
 
+std::optional<geometry_msgs::msg::TransformStamped> PlannerBase::get_tf(
+  const std::string& to_frame, 
+  const std::string& from_frame)
+{
+  TransformStamped tf_stamped;
+
+  try 
+  {
+    tf_stamped = tf_buffer_->lookupTransform(to_frame, from_frame, tf2::TimePointZero, std::chrono::milliseconds(500));
+  } 
+  catch (tf2::TransformException & ex) 
+  {
+    RCLCPP_ERROR(get_logger(), "Could not transform %s to %s: %s", to_frame.c_str(), from_frame.c_str(), ex.what());
+    return std::nullopt;
+  }
+  catch (...) 
+  {
+    RCLCPP_ERROR(get_logger(), "Unknown exception in transform %s to %s", to_frame.c_str(), from_frame.c_str());
+    return std::nullopt;
+  }
+
+  RCLCPP_WARN(get_logger(), "get_tf OK!");
+  return std::make_optional(std::move(tf_stamped));
+}
 

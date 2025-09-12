@@ -1,4 +1,4 @@
-#include "manipulation/node_base.hpp"
+#include "node_base.hpp"
 
 template <typename T>
 bool NodeBase::send_sync_req(
@@ -19,7 +19,7 @@ bool NodeBase::send_sync_req(
   switch (status)
   {
   case std::future_status::ready:
-    // Yech!!!
+    RCLCPP_DEBUG(get_logger(), "call service %s successfully", srv_name.c_str());
     break;
   case std::future_status::deferred:
     RCLCPP_INFO(get_logger(), "Failed to call service %s, status: %s", srv_name.c_str(), "deferred");
@@ -61,7 +61,6 @@ bool NodeBase::cli_wait_for_srv(
 
   return true;
 }
-
 
 template <typename T>
 void NodeBase::reset_req_res(

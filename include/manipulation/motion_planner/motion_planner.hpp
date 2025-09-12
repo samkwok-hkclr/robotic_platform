@@ -8,6 +8,7 @@
 #include <memory>
 #include <chrono>
 #include <algorithm>
+#include <string_view>
 
 #include <yaml-cpp/yaml.h>
 #include <Eigen/Geometry>
@@ -29,7 +30,7 @@
 #include "robot_controller_msgs/srv/get_current_pose.hpp"
 #include "robot_controller_msgs/srv/robot_speed.hpp"
 
-#include "manipulation/planner_base.hpp"
+#include "planner_base.hpp"
 #include "manipulation/poses_loader.hpp"
 #include "manipulation/end_effector_ctrl/vacuum_gripper_ctlr.hpp"
 
@@ -44,7 +45,6 @@ class MotionPlanner : public PlannerBase
   using Trigger = std_srvs::srv::Trigger;
 
   using Pose = geometry_msgs::msg::Pose;
-
   using Range = sensor_msgs::msg::Range;
 
   using PickPlanResult = robotic_platform_msgs::msg::PickPlanResult;
@@ -66,6 +66,7 @@ public:
 
   bool move_to_home_pose(const float speed);
   bool move_to_middle_pose(const float speed);
+  bool move_to_scan_pose(const float speed);
   bool move_to_pre_scan_pose(const float speed);
   bool move_to_before_pick_poses(const float speed);
   bool move_to_before_place_poses(const float speed);
@@ -79,8 +80,7 @@ public:
   bool try_to_pick(
     const Pose& pre_pick_pose, 
     const std::vector<Pose>& pick_poses, 
-    const std::chrono::milliseconds leak_check_duration = std::chrono::milliseconds(500),
-    const uint8_t max_retries = 3);
+    const std::chrono::milliseconds leak_check_duration = std::chrono::milliseconds(500));
   bool try_to_place(
     const Pose& pre_place_pose, 
     const std::vector<Pose>& place_poses,
@@ -91,7 +91,7 @@ public:
   void move_to_cb(
     const std::shared_ptr<Trigger::Request> request, 
     std::shared_ptr<Trigger::Response> response,
-    const std::string& pose);
+    std::string_view pose);
 
   std::chrono::duration<double> get_cli_req_timeout() const override 
   {
@@ -100,11 +100,13 @@ public:
 
 private:
   std::mutex mutex_;
-
+  uint16_t max_pick_attempt_;
+  
   std::shared_ptr<VacuumGripperCtlr> gripper_;
 
   Pose home_pose_;
   Pose middle_pose_;
+  Pose scan_pose_;
   Pose pre_scan_pose_;
 
   Pose pre_pick_pose_;
@@ -116,7 +118,7 @@ private:
   std::vector<Pose> lifted_place_waypoints_;
 
   std::vector<std::string> move_to_srv_names_;
-  std::map<std::string, std::function<bool(float)>> pose_actions;
+  std::map<std::string_view, std::function<bool(float)>, std::less<>> pose_actions;
   
   rclcpp::CallbackGroup::SharedPtr srv_ser_cbg_;
   rclcpp::CallbackGroup::SharedPtr exec_srv_cli_cbg_;

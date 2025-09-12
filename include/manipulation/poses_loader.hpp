@@ -26,7 +26,7 @@ public:
 
   std::optional<geometry_msgs::msg::Pose> parse_pose(const YAML::Node& node)
   {
-    if (!node || !node["position"] || !node["orientation"]) 
+    if (!node || !node["position"]) 
     {
       RCLCPP_ERROR(get_logger(), "The pose node is empty");
       return std::nullopt;
@@ -35,15 +35,69 @@ public:
     try 
     {
       Pose pose;
+      if (node["position"].size() != 3) 
+      {
+        RCLCPP_ERROR(get_logger(), "Position must have 3 elements (x, y, z)");
+        return std::nullopt;
+      }
       pose.position.x = node["position"][0].as<double>();
       pose.position.y = node["position"][1].as<double>();
       pose.position.z = node["position"][2].as<double>();
-      pose.orientation.x = node["orientation"][0].as<double>();
-      pose.orientation.y = node["orientation"][1].as<double>();
-      pose.orientation.z = node["orientation"][2].as<double>();
-      pose.orientation.w = node["orientation"][3].as<double>();
+
+      if (node["rpy"])
+      {
+        if (node["rpy"].size() != 3)
+        {
+          RCLCPP_ERROR(get_logger(), "roll, pitch, yaw must have 3 elements (r, p, y)");
+          return std::nullopt;
+        }
+        double roll, pitch, yaw;
+        roll = node["rpy"][0].as<double>();
+        pitch = node["rpy"][1].as<double>();
+        yaw = node["rpy"][2].as<double>();
+
+        tf2::Quaternion q;
+        q.setRPY(roll, pitch, yaw);
+        q.normalize();
+
+        pose.orientation.x = q.x();
+        pose.orientation.y = q.y();
+        pose.orientation.z = q.z();
+        pose.orientation.w = q.w();
+      }
+      else if (node["orientation"])
+      {
+        if (node["orientation"].size() != 4) 
+        {
+          RCLCPP_ERROR(get_logger(), "Orientation must have 4 elements (x, y, z, w)");
+          return std::nullopt;
+        }
+        pose.orientation.x = node["orientation"][0].as<double>();
+        pose.orientation.y = node["orientation"][1].as<double>();
+        pose.orientation.z = node["orientation"][2].as<double>();
+        pose.orientation.w = node["orientation"][3].as<double>();   
+      }
+      else
+      {
+        RCLCPP_WARN(get_logger(), "Quaternion is not defined");
+        return std::nullopt;
+      }
+
+      const double norm = std::sqrt(
+        pose.orientation.x * pose.orientation.x +
+        pose.orientation.y * pose.orientation.y +
+        pose.orientation.z * pose.orientation.z +
+        pose.orientation.w * pose.orientation.w
+      );
+
+      if (std::abs(norm - 1.0) > 1e-3) 
+      {
+        RCLCPP_WARN(get_logger(), "%s", node["rpy"] ? "rpy" : "quaternion");
+        RCLCPP_WARN(get_logger(), "Quaternion is not normalized (norm = %f). Consider normalizing.", norm);
+      }
       
       return std::make_optional(std::move(pose));
+
     } 
     catch (const YAML::Exception& e) 
     {
@@ -132,7 +186,10 @@ public:
       });
   }
 
-  void load_waypoints_from_yaml(const YAML::Node& node, const std::string& name, std::vector<Pose>& target_waypoints)
+  void load_waypoints_from_yaml(
+    const YAML::Node& node, 
+    const std::string& name, 
+    std::vector<Pose>& target_waypoints)
   {
     if (!node || !node[name]) 
     {
@@ -145,11 +202,17 @@ public:
 
     for (const auto& waypoint : node[name]) 
     {
-      int order = waypoint["order"].as<int>();
+      if (!waypoint["order"] || !waypoint["pose"]) 
+      {
+        RCLCPP_ERROR(get_logger(), "Waypoint missing 'order' or 'pose'");
+        continue;
+      }
+
+      const int order = waypoint["order"].as<int>();
 
       std::optional<Pose> pose = parse_pose(waypoint["pose"]);
       if (pose.has_value()) 
-        target_waypoints.emplace_back(std::move(pose.value()));
+        ordered_waypoints.emplace_back(order, std::move(pose.value()));
       else
         RCLCPP_ERROR(get_logger(), "Invalid pose in %s (order %d)", name.c_str(), order);
     }
@@ -159,9 +222,10 @@ public:
           return a.first < b.first;
       });
 
-    for (auto& [order, pose] : ordered_waypoints) 
+    target_waypoints.reserve(ordered_waypoints.size());
+    for (auto& wp : ordered_waypoints) 
     {
-      target_waypoints.emplace_back(std::move(pose));
+      target_waypoints.push_back(std::move(wp.second));
     }
   }
 

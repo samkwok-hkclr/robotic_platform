@@ -4,6 +4,7 @@
 #pragma once
 
 #include <memory>
+#include <string>
 #include <chrono>
 
 #include <Eigen/Geometry>
@@ -11,8 +12,18 @@
 #include "rclcpp/rclcpp.hpp"
 #include "rclcpp_action/rclcpp_action.hpp"
 
+#include "tf2/exceptions.h"
+#include "tf2/convert.h"
+
+#include "tf2/LinearMath/Transform.h"
 #include "tf2/LinearMath/Quaternion.h"
+
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+
 #include "tf2_ros/transform_broadcaster.h"
+#include "tf2_ros/static_transform_broadcaster.h"
+#include "tf2_ros/transform_listener.h"
+#include "tf2_ros/buffer.h"
 
 #include "std_srvs/srv/set_bool.hpp"
 
@@ -44,6 +55,12 @@ public:
 	explicit PlannerBase(std::string node_name, const rclcpp::NodeOptions& options);
 	~PlannerBase() = default;
 
+  tf2::Transform get_g(const Pose& pose);
+  tf2::Transform get_g(double px, double py, double pz, double roll, double pitch, double yaw);
+  tf2::Transform get_g(double px, double py, double pz, double qx, double qy, double qz, double qw);
+  void print_g(const tf2::Transform& g) const;
+  Pose cvt_g_to_pose(const tf2::Transform& g) const;
+
 	virtual Pose compose_pose_msg(const std::vector<double>& pose_vec);
 
 	virtual void pose_translation(Pose::SharedPtr pose, float x, float y, float z);
@@ -62,8 +79,16 @@ public:
     const std::string& parent_frame,
     const std::string& child_frame);
 
-private:
+  virtual std::optional<TransformStamped> get_tf(
+    const std::string& to_frame, 
+    const std::string& from_frame);
+
+private:  
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
+  std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_broadcaster_;
+
+  std::shared_ptr<tf2_ros::TransformListener> transform_listener_{nullptr};
+  std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
 
 };
 
