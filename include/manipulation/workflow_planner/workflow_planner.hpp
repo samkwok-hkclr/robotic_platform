@@ -22,9 +22,10 @@
 #include "std_msgs/msg/float32.hpp"
 #include "geometry_msgs/msg/pose.hpp"
 
-#include "lifecycle_msgs/srv/change_state.hpp"
 #include "lifecycle_msgs/msg/state.hpp"
 #include "lifecycle_msgs/msg/transition.hpp"
+#include "lifecycle_msgs/srv/change_state.hpp"
+#include "lifecycle_msgs/srv/get_state.hpp"
 
 #include "robotic_platform_msgs/action/pick.hpp"
 #include "robotic_platform_msgs/action/place.hpp"
@@ -61,7 +62,9 @@ class WorkflowPlanner : public PlannerBase
   using Pose = geometry_msgs::msg::Pose;
   using TransformStamped = geometry_msgs::msg::TransformStamped;
 
+  using State = lifecycle_msgs::msg::State;
   using Transition = lifecycle_msgs::msg::Transition;
+  using GetState = lifecycle_msgs::srv::GetState;
   using ChangeState = lifecycle_msgs::srv::ChangeState;
 
   using PickPlanResult = robotic_platform_msgs::msg::PickPlanResult;
@@ -110,6 +113,7 @@ public:
   std::string get_flat_link(uint8_t rack_id, uint8_t shelf_level) const;
   std::string get_place_link(uint8_t table_id, uint8_t index) const;
 
+  std::optional<State> get_camera_lifecycle_state(RobotArm arm);
   bool set_camera_lifecycle(RobotArm arm, bool activate);
 
   bool optimal_pick_elvation(const RackInfo& rack);
@@ -120,8 +124,7 @@ public:
   std::optional<double> try_to_pick_up(
     RobotArm arm, const int32_t sku_id, const uint8_t camera_id, const RackInfo& rack);
 
-  bool try_to_place_down(
-    RobotArm arm, double height, const TableInfo& table);
+  bool try_to_place_down(RobotArm arm, double height, const TableInfo& table);
 
   std::optional<std::vector<ObjectPose>> try_to_scan(
     RobotArm arm, const int32_t sku_id, const uint8_t camera_id, const Pose& scan_pose);
@@ -136,6 +139,8 @@ public:
   void debug_cb(const Float32::SharedPtr msg);
 
 private:
+  bool simulation_;
+  
   std::mutex mutex_;
   std::mutex tf_mutex_;
   
@@ -148,9 +153,11 @@ private:
   uint8_t max_pick_attempt_;
   double valid_z_threshold_;
   uint16_t max_scan_attempt_;
-  double re_scan_translation_;
+  double re_scan_x_translation_;
+  double re_scan_y_translation_;
   double place_offset_;
-  double scan_distance_;
+  double scan_x_distance_;
+  double scan_z_distance_;
 
   double optimal_arm_flat_height_distance_;
   double optimal_arm_flat_front_distance_;
@@ -184,7 +191,8 @@ private:
   rclcpp::Client<PickPlan>::SharedPtr pick_plan_cli_;
   rclcpp::Client<PlacePlan>::SharedPtr place_plan_cli_;
 
-  std::map<RobotArm, rclcpp::Client<ChangeState>::SharedPtr> camera_cli_;
+  std::map<RobotArm, rclcpp::Client<GetState>::SharedPtr> get_camera_cli_;
+  std::map<RobotArm, rclcpp::Client<ChangeState>::SharedPtr> change_camera_cli_;
 
   // ============== Action Sersers ==============
 

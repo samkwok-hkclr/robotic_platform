@@ -89,8 +89,10 @@ FoldElevatorDriver::FoldElevatorDriver(
     );
   }
 
-  for (const auto& k : keys) 
+  for (const auto& k : keys)
+  {
     joint_states_[k] = 0.0;
+  }
 
   RCLCPP_INFO(get_logger(), "Workflow Planner is up.");
 }
@@ -174,7 +176,7 @@ void FoldElevatorDriver::elevate_cb(
   const double POSITION_THRESHOLD = 0.005;
   const double ROTATION_THRESHOLD = 0.0523598776; // 3 deg in rad
   
-  RCLCPP_INFO(get_logger(), "Received elevate request - x: %.4f, z: %.4f, yaw: %.4f rad (%.4f°)", 
+  RCLCPP_INFO(get_logger(), "Received elevate request - x: %.4f, z: %.4f, yaw: %.4f rad (%.4f deg)", 
     request->x, request->z, request->yaw, request->yaw * 180.0/M_PI);
 
   // Check if position values are too small
@@ -248,6 +250,7 @@ bool FoldElevatorDriver::exec_wps(std::vector<Pose> wps)
 {
   auto req = std::make_shared<ExecuteWaypoints::Request>();
   req->waypoints = std::move(wps);
+  req->speed = 60;
 
   ExecuteWaypoints::Response::SharedPtr res;
   if (!send_sync_req<ExecuteWaypoints>(exec_wps_cli_, req, res, __FUNCTION__)) 

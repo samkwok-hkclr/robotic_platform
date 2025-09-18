@@ -97,6 +97,7 @@ void WorkflowPlanner::place_execution(const std::shared_ptr<GoalHandlerPlace> go
       result->results.emplace_back(msg);
       continue;
     }
+    
 
     if (!motion_planner_->move_to_action_pose(arm, 100.0f)) 
     {
@@ -112,6 +113,8 @@ void WorkflowPlanner::place_execution(const std::shared_ptr<GoalHandlerPlace> go
       sku_id, 
       table.id, 
       table.index);
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
     bool success = try_to_place_down(arm, height + 0.04, table);
  

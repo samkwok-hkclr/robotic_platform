@@ -4,7 +4,8 @@ bool Manager::send_place_goal(
   const std::vector<OrderItem>& order_items,
   const std::vector<size_t>& items_selected,
   const uint8_t table_id,
-  const std::map<uint8_t, double>& place_height)
+  const std::map<uint8_t, double>& place_height,
+  std::vector<bool>& place_occupancy_map)
 {
   if (items_selected.size() != place_height.size())
     return false;
@@ -20,7 +21,7 @@ bool Manager::send_place_goal(
     RCLCPP_ERROR(get_logger(), "place Action server not available after waiting");
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }
-
+  
   auto goal_msg = Place::Goal();
   for (const auto& i : items_selected)
   {
@@ -30,12 +31,30 @@ bool Manager::send_place_goal(
     task.sku_id = order_items[i].sku.id;
     task.height = place_height.at(order_items[i].sku.is_suctionable ? RobotArm::LEFT_ACTION : RobotArm::RIGHT_ACTION); 
     task.table.id = table_id;
-    if (order_items[i].sku.is_suctionable)
-      task.table.index = i + 1; //i + 1; // FIXME!
-    else
-      task.table.index = order_items.size() + 1; //i + 1; // FIXME!
-    
-    goal_msg.tasks.push_back(task);
+
+    const auto& place_order = order_items[i].sku.is_suctionable ? LEFT_ARM_PLACE_ORDER : RIGHT_ARM_PLACE_ORDER;
+    task.table.index = 0;
+
+    for (uint8_t index : place_order) 
+    {
+      size_t map_index = index - 1;
+      if (map_index < place_occupancy_map.size() && !place_occupancy_map[map_index]) 
+      {
+        task.table.index = index;
+        place_occupancy_map[map_index] = true;
+        break;
+      }
+    }
+
+    if (task.table.index != 0) 
+    {
+      goal_msg.tasks.push_back(task);
+    } 
+    else 
+    {
+      RCLCPP_ERROR(this->get_logger(), "All place index is occupied");
+      return false;
+    }
   }
 
   RCLCPP_INFO(this->get_logger(), "Sending action goal");

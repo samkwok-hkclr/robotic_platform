@@ -55,7 +55,7 @@ bool WorkflowPlanner::try_to_place_down(
     return success;
   }
 
-  if (motion_planner_->place(arm, place_plan_result.value(), 50.0))
+  if (motion_planner_->place(arm, place_plan_result.value(), 75.0))
   {
     success = true;
   }

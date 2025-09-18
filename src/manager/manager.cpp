@@ -20,6 +20,12 @@ Manager::Manager(
   srv_ser_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   srv_cli_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   action_cli_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+  testing_timer_ = create_wall_timer(
+    std::chrono::milliseconds(100), 
+    std::bind(&Manager::testing_cb, this));
+
+  testing_pub_ = create_publisher<Int32>("testing", 10);
   
   for (const auto& name : rotation_name_)
   {
@@ -76,6 +82,12 @@ void Manager::new_order_cb(
   const uint8_t table_id = request->order.table_id;
   auto order_items = request->order.order_items;
   
+  if (order_items.size() > MAX_ORDER_ITEMS)
+  {
+    response->message = "Order items size is larger than MAX_ORDER_ITEMS";
+    return;
+  }
+
   if (table_id == 0)
   {
     response->message = "Incorrect table id";
@@ -85,6 +97,8 @@ void Manager::new_order_cb(
   RCLCPP_INFO(this->get_logger(), "Processing new order ID: %d for table: %d", order_id, table_id);
   std::vector<bool> items_completed(order_items.size(), false);
   std::vector<double> items_pick_height(order_items.size(), false);
+  std::vector<bool> place_occupancy_map;
+  place_occupancy_map.resize(6, false);
 
   bool all_items_completed = false;
 
@@ -151,7 +165,7 @@ void Manager::new_order_cb(
 
     // Step 7: Place all carried items
     RCLCPP_INFO(this->get_logger(), "Step 7: Place all carried items");
-    if (!send_place_goal(order_items, selected_indices, table_id, place_height)) 
+    if (!send_place_goal(order_items, selected_indices, table_id, place_height, place_occupancy_map)) 
     {
       RCLCPP_ERROR(this->get_logger(), "Failed to place item SKU");
       response->success = false;
@@ -191,4 +205,21 @@ void Manager::new_order_cb(
   RCLCPP_INFO(get_logger(), "Order %d completed successfully", order_id);
   response->success = true;
   response->message = "Order processed successfully";
+}
+
+void Manager::testing_cb(void)
+{
+  if (!testing_pub_ || testing_pub_->get_subscription_count() == 0)
+    return;
+
+  std::random_device rd;
+  std::mt19937 gen(rd());
+
+  std::uniform_int_distribution<int> dis(0, 100);
+
+  Int32 msg;
+  msg.data = dis(gen);
+
+  testing_pub_->publish(msg);
+  RCLCPP_INFO(get_logger(), "testing_cb: %d", msg.data);
 }

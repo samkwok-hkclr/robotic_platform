@@ -9,12 +9,15 @@ WorkflowPlanner::WorkflowPlanner(
   , motion_planner_(motion_planner)
   , state_(RobotStatus::IDLE)
 {
+  declare_parameter<bool>("sim", false);
   declare_parameter<double>("valid_z_threshold", 0.01);
   declare_parameter<int>("max_pick_attempt", 0);
   declare_parameter<int>("max_scan_attempt", 0);
-  declare_parameter<double>("re_scan_translation", 0.05);
+  declare_parameter<double>("re_scan_x_translation", 0.05);
+  declare_parameter<double>("re_scan_y_translation", 0.1);
   declare_parameter<double>("place_offset", 0.02);
-  declare_parameter<double>("scan_distance", 0.25);
+  declare_parameter<double>("scan_x_distance", 0.05);
+  declare_parameter<double>("scan_z_distance", 0.2);
   declare_parameter<double>("optimal_arm_flat_height_distance", 0.2);
   declare_parameter<double>("optimal_arm_flat_distance", 0.2);
   declare_parameter<double>("optimal_arm_flat_front_distance", 0.5);
@@ -25,12 +28,15 @@ WorkflowPlanner::WorkflowPlanner(
   declare_parameter<std::vector<double>>("tcp_to_right_camera", std::vector<double>{});
 
   std::string poses_file;
+  get_parameter("sim", simulation_);
   get_parameter("valid_z_threshold", valid_z_threshold_);
   get_parameter("max_pick_attempt", max_pick_attempt_);
   get_parameter("max_scan_attempt", max_scan_attempt_);
-  get_parameter("re_scan_translation", re_scan_translation_);
+  get_parameter("re_scan_x_translation", re_scan_x_translation_);
+  get_parameter("re_scan_y_translation", re_scan_y_translation_);
   get_parameter("place_offset", place_offset_);
-  get_parameter("scan_distance", scan_distance_);
+  get_parameter("scan_x_distance", scan_x_distance_);
+  get_parameter("scan_z_distance", scan_z_distance_);
   get_parameter("optimal_arm_flat_height_distance", optimal_arm_flat_height_distance_);
   get_parameter("table_front_offset", table_front_offset_);
   get_parameter("table_height_offset", table_height_offset_);
@@ -58,15 +64,21 @@ WorkflowPlanner::WorkflowPlanner(
     10, 
     std::bind(&WorkflowPlanner::debug_cb, this, _1));
 
-  const std::vector<std::pair<RobotArm, std::string>> camera_srv = {
-    { RobotArm::LEFT,  "/left_camera/realsense/change_state" },
-    { RobotArm::RIGHT, "/right_camera/realsense/change_state" }
+  const std::string camera_prefix = "/left_camera/realsense/";
+  const std::vector<std::tuple<RobotArm, std::string, std::string>> camera_srv = {
+    { RobotArm::LEFT, "get_state", "change_state" },
+    { RobotArm::RIGHT, "get_state", "change_state" }
   };
 
   for (const auto& cam : camera_srv)
   {
-    camera_cli_[cam.first] = create_client<ChangeState>(
-      cam.second, 
+    get_camera_cli_[std::get<0>(cam)] = create_client<GetState>(
+      camera_prefix + std::get<1>(cam), 
+      rmw_qos_profile_services_default,
+      cam_srv_cli_cbg_);
+
+    change_camera_cli_[std::get<0>(cam)] = create_client<ChangeState>(
+      camera_prefix + std::get<2>(cam), 
       rmw_qos_profile_services_default,
       cam_srv_cli_cbg_);
   }

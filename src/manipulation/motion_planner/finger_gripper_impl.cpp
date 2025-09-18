@@ -32,7 +32,7 @@ bool MotionPlanner::try_to_pick_by_finger(
 
     RCLCPP_INFO(get_logger(), "Pick attempt %d/%d", attempt, max_pick_attempt_);
 
-    if (!move_to(arm, pick_poses, 20.0)) 
+    if (!move_to(arm, pick_poses, 50.0)) 
     {
       RCLCPP_ERROR(get_logger(), "Movement failed on attempt %d", attempt);
       return false;
@@ -61,7 +61,7 @@ bool MotionPlanner::try_to_pick_by_finger(
       start_drop_valid.store(false);
       obj_drop_detected.store(false); // Reset for next attempt
 
-      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      std::this_thread::sleep_for(std::chrono::milliseconds(1000));
       continue;
     }
 
@@ -80,10 +80,10 @@ bool MotionPlanner::try_to_place_by_finger(
 {
   (void) max_retries;
 
-  if (!move_to(arm, pre_place_pose, 50.0))
+  if (!move_to(arm, pre_place_pose, 75.0))
     return false;
   
-  if (!move_to(arm, place_poses, 25.0))
+  if (!move_to(arm, place_poses, 50.0))
     return false;
 
   if (!gripper_action(arm, false))

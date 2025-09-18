@@ -8,6 +8,8 @@
 
 #include "rclcpp/rclcpp.hpp"
 
+#include "std_msgs/msg/int32.hpp"
+
 #include "std_srvs/srv/trigger.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 

@@ -42,7 +42,9 @@ bool MotionPlanner::try_to_pick_by_vac(
     const auto start = std::chrono::steady_clock::now();
     start_leak_valid.store(true);
 
-    while (!leak_detected.load() && (std::chrono::steady_clock::now() - start) < leak_check_duration) 
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+    while (leak_detected.load() && (std::chrono::steady_clock::now() - start) < leak_check_duration) 
     {
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
@@ -139,10 +141,10 @@ bool MotionPlanner::try_to_place_by_vac(
 
   auto range_sub = create_subscription<Range>("ultrasonic_range", 10, range_cb);
 
-  if (!move_to(arm, pre_place_pose, 50.0))
+  if (!move_to(arm, pre_place_pose, 75.0))
     return false;
   
-  if (!move_to(arm, place_poses, 25.0))
+  if (!move_to(arm, place_poses, 50.0))
     return false;
 
   if (!gripper_action(arm, false))

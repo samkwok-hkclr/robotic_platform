@@ -66,8 +66,81 @@ std::optional<robotic_platform_msgs::msg::PlacePlanResult> WorkflowPlanner::get_
   return std::make_optional(std::move(response->result));
 }
 
+std::optional<lifecycle_msgs::msg::State> WorkflowPlanner::get_camera_lifecycle_state(RobotArm arm)
+{
+  RobotArm arm_wo_action;
+
+  if (arm == RobotArm::LEFT_ACTION)
+    arm_wo_action = RobotArm::LEFT;
+  else if (arm == RobotArm::RIGHT_ACTION)
+    arm_wo_action = RobotArm::RIGHT;
+  else
+    arm_wo_action = arm;
+
+  const std::string srv_name = "get_state";
+
+  uint8_t retry = 0;
+  const uint8_t SRV_CLI_MAX_RETIES = 5;
+
+  while (rclcpp::ok() && !get_camera_cli_[arm_wo_action]->wait_for_service(std::chrono::milliseconds(100)))
+  {
+    if (retry >= SRV_CLI_MAX_RETIES)
+    {
+      RCLCPP_DEBUG(get_logger(), "Interrupted while waiting for the service. Exiting.");
+      return std::nullopt;
+    } 
+
+    RCLCPP_DEBUG(get_logger(), "%s service not available, waiting again...", srv_name.c_str());
+    retry++;
+  }
+
+  auto request = std::make_shared<GetState::Request>();
+
+  auto future = get_camera_cli_[arm_wo_action]->async_send_request(std::move(request));
+  std::future_status status = future.wait_for(get_cli_req_timeout());
+
+  switch (status)
+  {
+  case std::future_status::ready:
+    RCLCPP_DEBUG(get_logger(), "call service %s successfully", srv_name.c_str());
+    break;
+  case std::future_status::deferred:
+    RCLCPP_INFO(get_logger(), "Failed to call service %s, status: %s", srv_name.c_str(), "deferred");
+    return std::nullopt;
+  case std::future_status::timeout:
+    RCLCPP_INFO(get_logger(), "Failed to call service %s, status: %s", srv_name.c_str(), "timeout");
+    return std::nullopt;
+  }
+
+  auto response = future.get();
+
+  if (!response)
+  {
+    RCLCPP_INFO(get_logger(), "Service %s call failed", srv_name.c_str());
+    return std::nullopt;
+  }
+
+  return std::make_optional(std::move(response->current_state));
+}
+
 bool WorkflowPlanner::set_camera_lifecycle(RobotArm arm, bool activate)
 {
+  std::optional<State> opt = get_camera_lifecycle_state(arm);
+
+  if (activate && opt.value().id == State::PRIMARY_STATE_INACTIVE)
+  {
+    RCLCPP_WARN(get_logger(), "Arm %d camera lifecycle transition requested: INACTIVE -> ACTIVE", static_cast<int>(arm));  
+  }
+  else if (!activate && opt.value().id == State::PRIMARY_STATE_ACTIVE)
+  {
+    RCLCPP_WARN(get_logger(), "Arm %d camera lifecycle transition requested: ACTIVE -> INACTIVE", static_cast<int>(arm));
+  }
+  else
+  {
+    RCLCPP_ERROR(get_logger(), "Unexpected state: Camera on arm %d when activation/deactivation requested", static_cast<int>(arm));
+    return true;
+  }
+
   RobotArm arm_wo_action;
 
   if (arm == RobotArm::LEFT_ACTION)
@@ -82,13 +155,13 @@ bool WorkflowPlanner::set_camera_lifecycle(RobotArm arm, bool activate)
   uint8_t retry = 0;
   const uint8_t SRV_CLI_MAX_RETIES = 5;
 
-  while (rclcpp::ok() && !camera_cli_[arm_wo_action]->wait_for_service(std::chrono::milliseconds(100)))
+  while (rclcpp::ok() && !change_camera_cli_[arm_wo_action]->wait_for_service(std::chrono::milliseconds(100)))
   {
     if (retry >= SRV_CLI_MAX_RETIES)
     {
       RCLCPP_DEBUG(get_logger(), "Interrupted while waiting for the service. Exiting.");
       return false;
-    }
+    } 
 
     RCLCPP_DEBUG(get_logger(), "%s service not available, waiting again...", srv_name.c_str());
     retry++;
@@ -101,7 +174,7 @@ bool WorkflowPlanner::set_camera_lifecycle(RobotArm arm, bool activate)
   else
     request->transition.id = Transition::TRANSITION_DEACTIVATE;
 
-  auto future = camera_cli_[arm_wo_action]->async_send_request(request);
+  auto future = change_camera_cli_[arm_wo_action]->async_send_request(std::move(request));
   std::future_status status = future.wait_for(get_cli_req_timeout());
 
   switch (status)
@@ -127,28 +200,6 @@ bool WorkflowPlanner::set_camera_lifecycle(RobotArm arm, bool activate)
 
   return true;
 }
-// std::optional<geometry_msgs::msg::Pose> WorkflowPlanner::get_curr_pose(RobotArm arm, const std::string& joint_name)
-// {
-//   if (joint_name.empty()) 
-//   {
-//     RCLCPP_ERROR(get_logger(), "Joint name is empty!");
-//     return std::nullopt;
-//   } 
-  
-//   auto request = std::make_shared<GetPose::Request>();
-//   request->joint_name = joint_name;
-//   GetPose::Response::SharedPtr response;
-//   if (!(send_sync_req<GetPose>(get_curr_pose_cli_[arm], std::move(request), response) && response))
-//   {
-//     RCLCPP_ERROR(get_logger(), "Sent GetPose request failed");
-//     return std::nullopt;
-//   }
-
-//   if (!response->success)
-//     return std::nullopt; 
-
-//   return std::make_optional(std::move(response->pose));
-// }
 
 std::optional<geometry_msgs::msg::Pose> WorkflowPlanner::get_scan_pose(uint8_t rack_id, uint8_t shelf_level, uint8_t shelf_slot)
 {
@@ -166,7 +217,7 @@ std::optional<geometry_msgs::msg::Pose> WorkflowPlanner::get_scan_pose(uint8_t r
   tf2::Transform g_b__slot;
   tf2::fromMsg(tf_stamped.value().transform, g_b__slot);
 
-  tf2::Transform g_slot__scan = get_g(0, 0, -scan_distance_, 0, 0, 0);
+  tf2::Transform g_slot__scan = get_g(-scan_x_distance_, 0, -scan_z_distance_, 0, 0, 0);
   tf2::Transform g_b__scan = g_b__slot * g_slot__scan;
 
   RCLCPP_ERROR(get_logger(), "Get scan pose okay");

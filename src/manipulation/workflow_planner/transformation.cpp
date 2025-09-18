@@ -17,7 +17,7 @@ std::optional<geometry_msgs::msg::Pose> WorkflowPlanner::extract_object_pose(
     return std::nullopt;
   }
 
-  tf2::Transform g_cam__obj = get_g(poses_in_camera[min_z_index].pose);
+  tf2::Transform g_cam__obj_rot = get_g(poses_in_camera[min_z_index].pose);
 
   std::string tcp;
   if (arm == RobotArm::LEFT || arm == RobotArm::LEFT_ACTION)
@@ -43,7 +43,7 @@ std::optional<geometry_msgs::msg::Pose> WorkflowPlanner::extract_object_pose(
       origin_arm = RobotArm::LEFT;
       break;
     case RobotArm::RIGHT_ACTION:
-      origin_arm = RobotArm::LEFT;
+      origin_arm = RobotArm::RIGHT;
       break;    
     default:
       origin_arm = arm;
@@ -53,9 +53,29 @@ std::optional<geometry_msgs::msg::Pose> WorkflowPlanner::extract_object_pose(
   if (auto it = g_tcp__cam_.find(origin_arm); it == g_tcp__cam_.end())
     return std::nullopt;
 
+  tf2::Transform g_obj_rot__obj;
+  switch (arm)
+  {
+    case RobotArm::LEFT:
+    case RobotArm::LEFT_ACTION:
+      g_obj_rot__obj = get_g(0, 0, 0, 0, 0, M_PI/2.0);
+      break;
+    case RobotArm::RIGHT:
+    case RobotArm::RIGHT_ACTION:
+      g_obj_rot__obj = get_g(0, 0, 0, 0, 0, 0);
+      break;    
+    default:
+      RCLCPP_ERROR(get_logger(), "WHOLE does not handle");
+      return std::nullopt;
+  }
+
+  tf2::Transform g_cam__obj = g_cam__obj_rot * g_obj_rot__obj;
+  RCLCPP_INFO(get_logger(), "g_cam__obj:");
+  print_g(g_cam__obj);
+
   tf2::Transform g_b__obj = g_b__tcp * g_tcp__cam_.at(origin_arm) * g_cam__obj;
+  RCLCPP_INFO(get_logger(), "g_b__obj:");
   print_g(g_b__obj);
-  RCLCPP_INFO(get_logger(), "g_b__obj OK");
 
   Pose object_pose = cvt_g_to_pose(g_b__obj);
 

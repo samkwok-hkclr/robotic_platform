@@ -169,7 +169,6 @@ bool FoldElevatorDriver::rotate_by_pose(double yaw, std::string* message)
   return true;
 } 
 
-
 bool FoldElevatorDriver::rotate_relative(
   double primary_delta,
   double fallback_delta,

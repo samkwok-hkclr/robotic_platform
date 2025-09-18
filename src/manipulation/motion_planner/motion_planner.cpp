@@ -32,12 +32,13 @@ MotionPlanner::MotionPlanner(
   std::vector<double> left_home_joints = get_parameter("left_home_joints").as_double_array();
   std::vector<double> left_holding_joints = get_parameter("left_holding_joints").as_double_array();
   std::vector<double> left_action_joints = get_parameter("left_action_joints").as_double_array();
+
   std::vector<double> right_zero_joints = get_parameter("right_zero_joints").as_double_array();
   std::vector<double> right_home_joints = get_parameter("right_home_joints").as_double_array();
   std::vector<double> right_holding_joints = get_parameter("right_holding_joints").as_double_array();
   std::vector<double> right_action_joints = get_parameter("right_action_joints").as_double_array();
 
-  auto initializePose = [](auto& pose_map, auto& left_joints, auto& right_joints, RobotArm left_key, RobotArm right_key) {
+  auto initialize_pose = [](auto& pose_map, auto& left_joints, auto& right_joints, RobotArm left_key, RobotArm right_key) {
     if (left_joints.size() != 7 || right_joints.size() != 7) {
       rclcpp::shutdown();
       return false;
@@ -52,56 +53,10 @@ MotionPlanner::MotionPlanner(
     return true;
   };
 
-  // Usage
-  if (!initializePose(zero_joint_pose_, left_zero_joints, right_zero_joints, RobotArm::LEFT, RobotArm::RIGHT) ||
-      !initializePose(home_joint_pose_, left_home_joints, right_home_joints, RobotArm::LEFT, RobotArm::RIGHT) ||
-      !initializePose(holding_joint_pose_, left_holding_joints, right_holding_joints, RobotArm::LEFT, RobotArm::RIGHT) ||
-      !initializePose(action_joint_pose_, left_action_joints, right_action_joints, RobotArm::LEFT, RobotArm::RIGHT)) {
-    return;
-  }
-
-  // if (left_zero_joints.size() != 7 || right_zero_joints.size() != 7)
-  // {
-  //   rclcpp::shutdown();
-  //   return;
-  // }
-  // zero_joint_pose_[RobotArm::LEFT] = std::move(left_zero_joints);
-  // zero_joint_pose_[RobotArm::LEFT_ACTION] = zero_joint_pose_[RobotArm::LEFT];
-  // zero_joint_pose_[RobotArm::LEFT_ACTION].emplace(zero_joint_pose_[RobotArm::LEFT_ACTION].begin(), 0.0);
-
-  // zero_joint_pose_[RobotArm::RIGHT] = std::move(right_zero_joints);
-  // zero_joint_pose_[RobotArm::RIGHT_ACTION] = zero_joint_pose_[RobotArm::RIGHT];
-  // zero_joint_pose_[RobotArm::RIGHT_ACTION].emplace(zero_joint_pose_[RobotArm::RIGHT_ACTION].begin(), 0.0);
-
-  // // help me to generate the other poses
-  // if (left_home_joints.size() != 7 || right_home_joints.size() != 7)
-  // {
-  //   rclcpp::shutdown();
-  //   return;
-  // }
-  // home_joint_pose_[RobotArm::LEFT] = std::move(left_home_joints);
-  // home_joint_pose_[RobotArm::RIGHT] = std::move(right_home_joints);
-
-  // if (left_holding_joints.size() != 7 || right_holding_joints.size() != 7)
-  // {
-  //   rclcpp::shutdown();
-  //   return;
-  // }
-  // holding_joint_pose_[RobotArm::LEFT] = std::move(left_holding_joints);
-  // holding_joint_pose_[RobotArm::RIGHT] = std::move(right_holding_joints);
-
-  // if (left_action_joints.size() != 7 || right_action_joints.size() != 7)
-  // {
-  //   rclcpp::shutdown();
-  //   return;
-  // }
-  // action_joint_pose_[RobotArm::LEFT] = std::move(left_action_joints);
-  // action_joint_pose_[RobotArm::RIGHT] = std::move(right_action_joints);
-
-  PosesLoader loader;
-  std::optional<YAML::Node> config = loader.parse_yaml(poses_file);
-  if (!config.has_value())
-  {
+  if (!initialize_pose(zero_joint_pose_, left_zero_joints, right_zero_joints, RobotArm::LEFT, RobotArm::RIGHT) ||
+      !initialize_pose(home_joint_pose_, left_home_joints, right_home_joints, RobotArm::LEFT, RobotArm::RIGHT) ||
+      !initialize_pose(holding_joint_pose_, left_holding_joints, right_holding_joints, RobotArm::LEFT, RobotArm::RIGHT) ||
+      !initialize_pose(action_joint_pose_, left_action_joints, right_action_joints, RobotArm::LEFT, RobotArm::RIGHT)) {
     rclcpp::shutdown();
     return;
   }
@@ -118,22 +73,7 @@ MotionPlanner::MotionPlanner(
     { RobotArm::LEFT_ACTION, maps },
     { RobotArm::RIGHT, maps },
     { RobotArm::RIGHT_ACTION, maps }
-      
-
-    // { RobotArm::RIGHT,
-    //   {
-    //     { "zero_pose", std::bind(&MotionPlanner::move_to_zero_pose, this, _1, _2) },
-    //     { "home_pose", std::bind(&MotionPlanner::move_to_home_pose, this, _1, _2) },
-    //     { "holding_pose", std::bind(&MotionPlanner::move_to_holding_pose, this, _1, _2) },
-    //     { "action_pose", std::bind(&MotionPlanner::move_to_action_pose, this, _1, _2) },
-    //   }
-    // }
   };
-
-  // loader.load_pose_from_yaml(config.value(), "home_pose", home_pose_);
-
-  RCLCPP_INFO(get_logger(), "Motion Planner - home_pose:");
-  // print_pose(home_pose_);
 
   RCLCPP_INFO(get_logger(), "Motion Planner - All poses are loaded");
 

@@ -96,7 +96,7 @@ public:
     RobotArm arm, 
     const Pose& pre_pick_pose, 
     const std::vector<Pose>& pick_poses, 
-    const std::chrono::milliseconds leak_check_duration = std::chrono::milliseconds(500));
+    const std::chrono::milliseconds leak_check_duration = std::chrono::milliseconds(1000));
 
   // right arm
   bool try_to_pick_by_finger(

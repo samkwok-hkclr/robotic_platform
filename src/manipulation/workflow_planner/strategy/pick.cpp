@@ -8,6 +8,8 @@ std::optional<double> WorkflowPlanner::try_to_pick_up(
   uint8_t attempt = 1;
   bool success = false;
 
+  clear_tf_buf();
+
   const std::string flat_frame = get_flat_link(rack.id, rack.shelf_level);
 
   for (; attempt <= max_pick_attempt_; attempt++)
@@ -26,19 +28,25 @@ std::optional<double> WorkflowPlanner::try_to_pick_up(
     std::optional<std::vector<ObjectPose>> obj_poses = try_to_scan(arm, sku_id, camera_id, scan_pose.value());
     
     // FIXME: debug now
-    if (false && !obj_poses.has_value())
+    if (!obj_poses.has_value())
     {
       RCLCPP_INFO(get_logger(), "vision algorithm have no value");
       return std::nullopt;
     }
 
-    // std::vector<ObjectPose>& poses_in_camera = obj_poses.value();
-    // DEBUG!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     std::vector<ObjectPose> poses_in_camera;
-    ObjectPose debug_msg;
-    debug_msg.pose = cvt_g_to_pose(get_g(0.08, 0, 0.28, 0, 0, 0));
-    poses_in_camera.push_back(debug_msg);
-    RCLCPP_INFO(get_logger(), "pose length: %ld", poses_in_camera.size());
+
+    if (simulation_)
+    {
+      ObjectPose sim_msg;
+      sim_msg.pose = cvt_g_to_pose(get_g(0.08, 0, 0.28, 0, 0, 0));
+      poses_in_camera.push_back(sim_msg);
+      RCLCPP_INFO(get_logger(), "Simulation pose length: %ld", poses_in_camera.size());
+    }
+    else
+    {
+      poses_in_camera = std::move(obj_poses.value());
+    }
 
     std::optional<Pose> obj_pose = extract_object_pose(arm, poses_in_camera);
     if (!obj_pose.has_value())

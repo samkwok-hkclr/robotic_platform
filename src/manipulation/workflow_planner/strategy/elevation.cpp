@@ -31,7 +31,7 @@ bool WorkflowPlanner::optimal_pick_elvation(const RackInfo& rack)
       break;
     case 4:
       p.position.x = -0.08;
-      p.position.z = 0.99;
+      p.position.z = 0.98;
       break;
     default:
       RCLCPP_WARN(get_logger(), "unknown shelf_level");

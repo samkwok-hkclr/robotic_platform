@@ -13,10 +13,28 @@ std::optional<std::map<uint8_t, double>> Manager::send_pick_goal(
   auto goal_msg = Pick::Goal();
   for (const auto& i : items_selected)
   {
+    uint8_t camera_id = 0, arm_id;
+
+    if (order_items[i].sku.is_grippable)
+    {
+      arm_id = RobotArm::RIGHT_ACTION;
+      camera_id = 2;
+    }
+    else if (order_items[i].sku.is_suctionable)
+    {
+      arm_id = RobotArm::LEFT_ACTION;
+      camera_id = 1;
+    }
+    else
+    {
+      RCLCPP_ERROR(this->get_logger(), "Arm and camera pair is incorrect!");
+      return std::nullopt;
+    }
+
     PickTask task;
     
-    task.arm_id = order_items[i].sku.is_suctionable ? RobotArm::LEFT_ACTION : RobotArm::RIGHT_ACTION;
-    task.camera_id = order_items[i].sku.is_suctionable ? RobotArm::LEFT_ACTION : RobotArm::RIGHT_ACTION;
+    task.arm_id = arm_id;
+    task.camera_id = camera_id;
     task.sku_id = order_items[i].sku.id;
     task.rack.id = order_items[i].rack.id;
     task.rack.shelf_level = order_items[i].rack.shelf_level;

@@ -6,7 +6,7 @@ TfBroadcaster::TfBroadcaster(
 : PlannerBase(node_name, options)
 {
   // FIXME: the frames should be provided by AGV
-	push_tf_buf(std::make_tuple(cvt_g_to_pose(get_g(0.9, 1.4, 0, 0, 0, M_PI/2)), "map", BASE_FOOTPRINT));
+	push_tf_buf(std::make_tuple(cvt_g_to_pose(get_g(0.9, 1.35, 0, 0, 0, M_PI/2)), "map", BASE_FOOTPRINT));
 
   setup_static_tf();
 
@@ -32,8 +32,8 @@ void TfBroadcaster::setup_static_tf()
   std::vector<ShelfDefinition> all_shelves = {
     {"rack_1", "shelf_1", { }},
     {"rack_1", "shelf_2", { 0.22, 0.37, 0.90 }},
-    {"rack_1", "shelf_3", { 0.22, 0.37, 0.90 }},
-    {"rack_1", "shelf_4", { 0.22, 0.37, 0.90 }},
+    {"rack_1", "shelf_3", { 0.22, 0.37, 0.61, 0.79, 0.92, 1.05 }},
+    {"rack_1", "shelf_4", { 0.24, 0.37, 0.61, 0.79, 0.92, 1.05 }},
     // {"rack_2", "shelf_2", {0.1, 0.15, 0.25, 0.4}}, // Irregular spacing
   };
 
@@ -45,7 +45,7 @@ void TfBroadcaster::setup_static_tf()
       std::string target_frame = shelf_def.rack + "_" + shelf_def.shelf + "_slot_" + std::to_string(slot_idx + 1) + "_link";
       
       push_static_tf(std::make_tuple(
-        cvt_g_to_pose(get_g(shelf_def.slot_distances[slot_idx], 0, 0, 0, -M_PI/2, -M_PI/2)),
+        cvt_g_to_pose(get_g(shelf_def.slot_distances[slot_idx], 0, 0, 0, -M_PI/2.0, -M_PI/2.0)),
         base_frame,
         target_frame
       ));

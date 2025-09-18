@@ -73,7 +73,7 @@ void WorkflowPlanner::pick_execution(const std::shared_ptr<GoalHandlerPick> goal
   for (const auto& [arm_id, camera_id, sku_id, rack, dimension] : goal->tasks) 
   {
     const RobotArm arm = static_cast<RobotArm>(arm_id);
-    
+
     PickResult msg;
     msg.arm_id = arm_id;
 
@@ -97,6 +97,8 @@ void WorkflowPlanner::pick_execution(const std::shared_ptr<GoalHandlerPick> goal
       result->results.emplace_back(msg);
       continue;
     }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
     
     RCLCPP_INFO(get_logger(), "Attempting pick-up: arm=%s, sku=%d, rack=%d, shelf_level=%d, shelf_slot=%d", 
       arm_to_str.at(arm).c_str(),
@@ -138,6 +140,7 @@ void WorkflowPlanner::pick_execution(const std::shared_ptr<GoalHandlerPick> goal
       continue;
     }
 
+    clear_tf_buf();
     RCLCPP_INFO(get_logger(), "SKU %d using %s arm", sku_id, arm_to_str.at(arm).c_str());
   }
 

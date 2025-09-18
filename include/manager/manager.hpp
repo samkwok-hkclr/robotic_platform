@@ -5,9 +5,9 @@
 
 #include <memory>
 #include <chrono>
+#include <random>
 
 #include "rclcpp/rclcpp.hpp"
-
 
 #include "geometry_msgs/msg/pose.hpp"
 
@@ -32,6 +32,7 @@ using std::placeholders::_3;
 
 class Manager : public PlannerBase
 {
+  using Int32 = std_msgs::msg::Int32;
   using Trigger = std_srvs::srv::Trigger;
   using Pose = geometry_msgs::msg::Pose;
 
@@ -55,6 +56,8 @@ public:
 	explicit Manager(std::string node_name, const rclcpp::NodeOptions& options);
 	~Manager() = default;
 
+  void testing_cb(void);
+
   std::vector<size_t> select_next_items(
     const std::vector<OrderItem>& items, 
     const std::vector<bool>& items_completed);
@@ -66,7 +69,8 @@ public:
     const std::vector<OrderItem>& order_items,
     const std::vector<size_t>& items_selected,
     const uint8_t table_id,
-    const std::map<uint8_t, double>& place_height);
+    const std::map<uint8_t, double>& place_height,
+    std::vector<bool>& place_occupancy_map);
 
   bool rotate_to(std::string direction);
   bool move_to_basic_pose(RobotArm arm, const std::string& pose);
@@ -86,6 +90,9 @@ private:
   rclcpp::CallbackGroup::SharedPtr srv_cli_cbg_;
   rclcpp::CallbackGroup::SharedPtr action_cli_cbg_;
 
+  rclcpp::TimerBase::SharedPtr testing_timer_;
+  rclcpp::Publisher<Int32>::SharedPtr testing_pub_;
+
   rclcpp::Service<NewOrder>::SharedPtr new_order_srv_;
 
   std::unordered_map<std::string, rclcpp::Client<Trigger>::SharedPtr> fold_elev_rotate_cli_;
@@ -103,6 +110,11 @@ private:
 
   constexpr static std::chrono::duration ACTION_TIMEOUT = std::chrono::seconds(180);
   constexpr static std::chrono::duration CLI_REQ_TIMEOUT = std::chrono::seconds(30);
+  constexpr static uint8_t MAX_ORDER_ITEMS = 6;
+  const std::vector<uint8_t> LEFT_ARM_PLACE_ORDER{1, 2, 4, 5, 3, 6};
+  const std::vector<uint8_t> RIGHT_ARM_PLACE_ORDER{3, 2, 6, 5, 1, 4};
+
+
 };
 
 #endif // MANAGER_HPP__
