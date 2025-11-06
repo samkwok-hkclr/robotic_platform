@@ -1,6 +1,6 @@
 #include "manipulation/motion_planner/motion_planner.hpp"
 
-bool MotionPlanner::try_to_pick(
+bool MotionPlanner::try_to_pick_by_vac(
   const Pose& pre_pick_pose, 
   const std::vector<Pose>& pick_poses, 
   const std::chrono::milliseconds leak_check_duration)
@@ -11,7 +11,11 @@ bool MotionPlanner::try_to_pick(
 
   auto leak_cb = [this, &start_leak_valid, &leak_detected](const Empty::SharedPtr msg) {
     (void) msg;
-    if (!start_leak_valid)
+
+    if (simulation_)
+      return;
+
+    if (!start_leak_valid.load())
       return;
 
     RCLCPP_WARN(get_logger(), "Leak detected during pick operation!");
@@ -24,27 +28,27 @@ bool MotionPlanner::try_to_pick(
   {
     RCLCPP_INFO(get_logger(), "Pick attempt %d/%d", attempt, max_pick_attempt_);
 
-    if (!gripper_action(true))
+    if (!gripper_action(RobotArm::LEFT, true))
       return false;
     
-    if (!move_to(pick_poses, 3.0)) 
+    if (!move_to(RobotArm::LEFT, pick_poses, 50.0)) 
     {
       RCLCPP_ERROR(get_logger(), "Movement failed on attempt %d", attempt);
       return false;
     }
 
     RCLCPP_DEBUG(get_logger(), "Checking for leaks...");
-    auto start = std::chrono::steady_clock::now();
+    const auto start = std::chrono::steady_clock::now();
     start_leak_valid.store(true);
 
-    while (!leak_detected && (std::chrono::steady_clock::now() - start) < leak_check_duration) 
+    while (!leak_detected.load() && (std::chrono::steady_clock::now() - start) < leak_check_duration) 
     {
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
-    if (leak_detected) 
+    if (leak_detected.load()) 
     {
-      if (!gripper_action(false))
+      if (!gripper_action(RobotArm::LEFT, false))
         return false;
 
       RCLCPP_ERROR(get_logger(), "Leak detected, retrying...");
@@ -62,12 +66,11 @@ bool MotionPlanner::try_to_pick(
   return false;
 }
 
-bool MotionPlanner::try_to_place(
+bool MotionPlanner::try_to_place_by_vac(
   const Pose& pre_place_pose, 
   const std::vector<Pose>& place_poses,
   const uint8_t max_retries)
 {
-  (void) pre_place_pose;
   (void) max_retries;
 
   std::atomic<bool> start_to_valid{false};
@@ -78,8 +81,13 @@ bool MotionPlanner::try_to_place(
   const uint32_t max_consecutive_failures = 3;
   const float tolerance = 0.01;
 
-  // how to pass start_to_valid, is_first_message, ... to range_cb?
   auto range_cb = [&](const Range::SharedPtr msg) {
+    if (simulation_)
+      return;
+
+    if (!enable_ultrasonic_)
+      return;
+
     if (!start_to_valid.load()) 
       return;
 
@@ -128,15 +136,18 @@ bool MotionPlanner::try_to_place(
   };
 
   auto range_sub = create_subscription<Range>("ultrasonic_range", 10, range_cb);
+
+  if (!move_to(RobotArm::LEFT, pre_place_pose, 80.0))
+    return false;
   
-  if (!move_to(place_poses, 10.0))
+  if (!move_to(RobotArm::LEFT, place_poses, 80.0))
     return false;
 
-  if (!gripper_action(false))
+  if (!gripper_action(RobotArm::LEFT, false))
     return false;
 
   start_to_valid.store(true);
-  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
   if (mono_increasing.load()) 
   {
@@ -151,21 +162,46 @@ bool MotionPlanner::try_to_place(
   return true;
 }
 
-bool MotionPlanner::move_to(const Pose& waypoint, const float speed)
+bool MotionPlanner::move_to(RobotArm arm, const std::vector<double>& joints, const float speed)
 {
-  std::vector<Pose> poses{ waypoint };
+  auto request = std::make_shared<ExecuteJoints::Request>();
+  request->joints.clear();
+  request->joints.insert(request->joints.end(), joints.begin(), joints.end());
+  request->speed = speed;
 
-  return move_to(poses, speed);
+  ExecuteJoints::Response::SharedPtr response;
+  if (!send_sync_req<ExecuteJoints>(exec_joints_cli_[arm], std::move(request), response) )
+  {
+    RCLCPP_ERROR(get_logger(), "Sent ExecuteJoints request failed");
+    return false;
+  }
+
+  if (!response->success)
+  {
+    RCLCPP_ERROR(get_logger(), "Unsuccessful: %s", response->message.c_str());
+    return false;
+  }
+
+  return true;
 }
 
-bool MotionPlanner::move_to(const std::vector<Pose>& waypoints, const float speed)
+bool MotionPlanner::move_to(RobotArm arm, const Pose& pose, const float speed)
+{
+  std::vector<Pose> poses{ pose };
+
+  return move_to(arm, poses, speed);
+}
+
+bool MotionPlanner::move_to(RobotArm arm, const std::vector<Pose>& waypoints, const float speed)
 {
   auto request = std::make_shared<ExecuteWaypoints::Request>();
+  
+  request->waypoints.clear();
   request->waypoints.insert(request->waypoints.end(), waypoints.begin(), waypoints.end());
   request->speed = speed;
 
   ExecuteWaypoints::Response::SharedPtr response;
-  if (!(send_sync_req<ExecuteWaypoints>(exec_wps_cli_, std::move(request), response) && response))
+  if (!send_sync_req<ExecuteWaypoints>(exec_wps_cli_[arm], std::move(request), response))
   {
     RCLCPP_ERROR(get_logger(), "Sent ExecuteWaypoints request failed");
     return false;

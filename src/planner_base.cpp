@@ -6,10 +6,10 @@ PlannerBase::PlannerBase(
 : NodeBase(node_name, options)
 {
   tf_broadcaster_ = std::make_unique<tf2_ros::TransformBroadcaster>(*this);
-  tf_static_broadcaster_ = std::make_shared<tf2_ros::StaticTransformBroadcaster>(this);
+  tf_static_broadcaster_ = std::make_unique<tf2_ros::StaticTransformBroadcaster>(this);
   
   tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
-  transform_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+  transform_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_);
 }
 
 tf2::Transform PlannerBase::get_g(const Pose& pose)
@@ -48,6 +48,7 @@ tf2::Transform PlannerBase::get_g(double px, double py, double pz, double qx, do
 {
   tf2::Transform g;
   tf2::Quaternion q(qx, qy, qz, qw);
+  q.normalize();
 
   g.setOrigin(tf2::Vector3(px, py, pz));
   g.setRotation(q);
@@ -119,14 +120,14 @@ void PlannerBase::pose_translation(Pose::SharedPtr pose, float x, float y, float
   pose->position.z = mat_transform(2, 3);
 }
 
-void PlannerBase::print_pose(const Pose& pose)
+void PlannerBase::print_pose(const Pose& pose) const
 {
-  RCLCPP_WARN(get_logger(), "[p.x: %.4f, p.y: %.4f, p.z: %.4f, q.x: %.4f, q.y: %.4f, q.z: %.4f, q.w: %.4f]", 
+  RCLCPP_WARN(get_logger(), "[p.x: %.6f, p.y: %.6f, p.z: %.6f, q.x: %.6f, q.y: %.6f, q.z: %.6f, q.w: %.6f]", 
     pose.position.x, pose.position.y, pose.position.z, 
     pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w);
 }
 
-void PlannerBase::print_pose_arr(const std::vector<Pose>& poses)
+void PlannerBase::print_pose_arr(const std::vector<Pose>& poses) const
 {
   for (const auto& pose : poses)
   {
@@ -134,7 +135,7 @@ void PlannerBase::print_pose_arr(const std::vector<Pose>& poses)
   }
 }
 
-geometry_msgs::msg::Pose PlannerBase::compose_pose_msg(const std::vector<double>& pose_vec)
+geometry_msgs::msg::Pose PlannerBase::compose_pose_msg(const std::vector<double>& pose_vec) const
 {
   if (pose_vec.size() != 7) 
   {
@@ -159,7 +160,7 @@ bool PlannerBase::are_poses_closed(
   const geometry_msgs::msg::Pose& pose_1,
   const geometry_msgs::msg::Pose& pose_2, 
   double pos_thd,
-  double ori_thd)
+  double ori_thd) const
 {
   Eigen::Vector3d pos1(pose_1.position.x, pose_1.position.y, pose_1.position.z);
   Eigen::Vector3d pos2(pose_2.position.x, pose_2.position.y, pose_2.position.z);
@@ -185,7 +186,7 @@ bool PlannerBase::are_poses_closed(
   return (q1.angularDistance(q2) < ori_thd);
 }
 
-void PlannerBase::send_transform(
+geometry_msgs::msg::TransformStamped PlannerBase::create_transform(
   const Pose& msg, 
   const std::string& parent_frame,
   const std::string& child_frame)
@@ -193,8 +194,8 @@ void PlannerBase::send_transform(
   TransformStamped t;
 
   t.header.stamp = get_clock()->now();
-  t.header.frame_id = parent_frame.c_str();
-  t.child_frame_id = child_frame.c_str();
+  t.header.frame_id = parent_frame;
+  t.child_frame_id = child_frame;
 
   t.transform.translation.x = msg.position.x;
   t.transform.translation.y = msg.position.y;
@@ -205,7 +206,25 @@ void PlannerBase::send_transform(
   t.transform.rotation.z = msg.orientation.z;
   t.transform.rotation.w = msg.orientation.w;
 
-  tf_broadcaster_->sendTransform(t);
+  return t;
+}
+
+void PlannerBase::send_transform(
+  const Pose& msg, 
+  const std::string& parent_frame,
+  const std::string& child_frame)
+{
+  auto transform = create_transform(msg, parent_frame, child_frame);
+  tf_broadcaster_->sendTransform(transform);
+}
+
+void PlannerBase::send_static_transform(
+  const Pose& msg, 
+  const std::string& parent_frame,
+  const std::string& child_frame)
+{
+  auto transform = create_transform(msg, parent_frame, child_frame);
+  tf_static_broadcaster_->sendTransform(transform);
 }
 
 std::optional<geometry_msgs::msg::TransformStamped> PlannerBase::get_tf(
@@ -216,7 +235,8 @@ std::optional<geometry_msgs::msg::TransformStamped> PlannerBase::get_tf(
 
   try 
   {
-    tf_stamped = tf_buffer_->lookupTransform(to_frame, from_frame, tf2::TimePointZero, std::chrono::milliseconds(500));
+    // Wait up to 1.0 second
+    tf_stamped = tf_buffer_->lookupTransform(to_frame, from_frame, tf2::TimePointZero, tf2::durationFromSec(1.0));
   } 
   catch (tf2::TransformException & ex) 
   {
@@ -229,7 +249,7 @@ std::optional<geometry_msgs::msg::TransformStamped> PlannerBase::get_tf(
     return std::nullopt;
   }
 
-  RCLCPP_WARN(get_logger(), "get_tf OK!");
+  RCLCPP_WARN(get_logger(), "get_tf OK! to_frame: %s, from_frame: %s", to_frame.c_str(), from_frame.c_str());
   return std::make_optional(std::move(tf_stamped));
 }
 

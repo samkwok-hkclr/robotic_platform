@@ -12,11 +12,11 @@ rclcpp_action::GoalResponse WorkflowPlanner::scan_sku_goal_cb(
     return rclcpp_action::GoalResponse::REJECT;
   }
 
-  if (scan_poses_.size() == 0)
-  {
-    RCLCPP_INFO(get_logger(), "Scan poses is empty.");
-    return rclcpp_action::GoalResponse::REJECT;
-  }
+  // if (scan_poses_.size() == 0)
+  // {
+  //   RCLCPP_INFO(get_logger(), "Scan poses is empty.");
+  //   return rclcpp_action::GoalResponse::REJECT;
+  // }
 
   RCLCPP_INFO(get_logger(), "Received goal request with order %u", goal->order_id);
   return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
@@ -67,31 +67,31 @@ void WorkflowPlanner::scan_sku_execution(const std::shared_ptr<GoalHandlerScanSk
   rclcpp::TimerBase::SharedPtr pub_fb_timer = create_wall_timer(std::chrono::seconds(1), pub_fb, exec_timer_cbg_);
   clear_tf_buf();
 
-  if (!motion_planner_->move_to_scan_pose(25.0))
-  {
-    goal_handle->abort(result);
-    return;
-  }
+  // if (!motion_planner_->move_to_scan_pose(25.0))
+  // {
+  //   goal_handle->abort(result);
+  //   return;
+  // }
 
-  RCLCPP_WARN(get_logger(), "start to scan <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
-  std::optional<std::vector<ObjectPose>> obj_poses = try_to_scan(goal->sku_id, goal->camera_id);
-  if (!obj_poses.has_value())
-  {
-    goal_handle->abort(result);
-    RCLCPP_INFO(get_logger(), "have no value");
-    return;
-  }
+  // RCLCPP_WARN(get_logger(), "start to scan <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
+  // std::optional<std::vector<ObjectPose>> obj_poses = try_to_scan(goal->sku_id, goal->camera_id);
+  // if (!obj_poses.has_value())
+  // {
+  //   goal_handle->abort(result);
+  //   RCLCPP_INFO(get_logger(), "have no value");
+  //   return;
+  // }
 
-  std::vector<ObjectPose>& poses_in_camera = obj_poses.value();
-  RCLCPP_INFO(get_logger(), "pose length: %ld", poses_in_camera.size());
+  // std::vector<ObjectPose>& poses_in_camera = obj_poses.value();
+  // RCLCPP_INFO(get_logger(), "pose length: %ld", poses_in_camera.size());
 
-  std::optional<Pose> obj_pose = extract_object_pose(poses_in_camera);
-  if (!obj_pose.has_value())
-  {
-    goal_handle->abort(result);
-    RCLCPP_INFO(get_logger(), "obj_pose have no value");
-    return;
-  }
+  // std::optional<Pose> obj_pose = extract_object_pose(poses_in_camera);
+  // if (!obj_pose.has_value())
+  // {
+  //   goal_handle->abort(result);
+  //   RCLCPP_INFO(get_logger(), "obj_pose have no value");
+  //   return;
+  // }
 
   if (rclcpp::ok()) 
   {

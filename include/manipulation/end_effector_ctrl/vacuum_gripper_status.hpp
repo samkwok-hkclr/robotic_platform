@@ -32,10 +32,10 @@ public:
   void set_temperature(float data) { temperature = data; }
 
 private:
-  bool state;
-  float pressure;
-  float distance;
-  float temperature;
+  std::atomic<bool> state;
+  std::atomic<float> pressure;
+  std::atomic<float> distance;
+  std::atomic<float> temperature;
 
 };
 

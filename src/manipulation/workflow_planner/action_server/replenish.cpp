@@ -13,11 +13,11 @@ rclcpp_action::GoalResponse WorkflowPlanner::replenish_goal_cb(
     return rclcpp_action::GoalResponse::REJECT;
   }
 
-  if (place_poses_.find(goal->sku_id) == place_poses_.end()) 
-  {
-    RCLCPP_ERROR(get_logger(), "Pose of sku_id [%d] not found.", goal->sku_id);
-    return rclcpp_action::GoalResponse::REJECT;
-  }
+  // if (place_poses_.find(goal->sku_id) == place_poses_.end()) 
+  // {
+  //   RCLCPP_ERROR(get_logger(), "Pose of sku_id [%d] not found.", goal->sku_id);
+  //   return rclcpp_action::GoalResponse::REJECT;
+  // }
 
   RCLCPP_INFO(get_logger(), "Received goal request with order %u", goal->order_id);
   return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;

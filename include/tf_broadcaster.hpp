@@ -36,7 +36,9 @@ public:
     const rclcpp::NodeOptions& options);
   ~TfBroadcaster() = default;
 
-  void push_tf_static_buf(const std::tuple<Pose, std::string, std::string>& tf);
+  void setup_static_tf(void);
+
+  void push_static_tf(const std::tuple<Pose, std::string, std::string>& tf);
   void push_tf_buf(const std::tuple<Pose, std::string, std::string>& tf);
   void clear_tf_buf();
 

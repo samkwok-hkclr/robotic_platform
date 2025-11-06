@@ -1,5 +1,5 @@
-#ifndef VACUUM_GRIPPER_CTLR_HPP__
-#define VACUUM_GRIPPER_CTLR_HPP__
+#ifndef vacuum_gripper_HPP__
+#define vacuum_gripper_HPP__
 
 #pragma once
 
@@ -25,7 +25,7 @@
 using std::placeholders::_1;
 using std::placeholders::_2;
 
-class VacuumGripperCtlr : public NodeBase
+class VacuumGripper : public NodeBase
 {
   using SetBool = std_srvs::srv::SetBool;
 
@@ -37,8 +37,8 @@ class VacuumGripperCtlr : public NodeBase
   using Range = sensor_msgs::msg::Range;
 
 public:
-  VacuumGripperCtlr(const rclcpp::NodeOptions& options);
-  ~VacuumGripperCtlr() = default;
+  VacuumGripper(const rclcpp::NodeOptions& options);
+  ~VacuumGripper() = default;
 
   void state_cb(const Bool::SharedPtr msg);
   void range_cb(const Range::SharedPtr msg);
@@ -56,11 +56,9 @@ private:
 
   VacuumGripperStatus status_;
 
-  rclcpp::TimerBase::SharedPtr leak_valid_timer;
-
   rclcpp::CallbackGroup::SharedPtr srv_cli_cbg_;
 
-  rclcpp::Client<SetBool>::SharedPtr valve_cli_;
+  rclcpp::TimerBase::SharedPtr leak_valid_timer;
 
   rclcpp::Publisher<Empty>::SharedPtr leak_pub_;
 
@@ -69,6 +67,8 @@ private:
   rclcpp::Subscription<Temperature>::SharedPtr temp_sub_;
   rclcpp::Subscription<FluidPressure>::SharedPtr pressure_sub_;
 
+  rclcpp::Client<SetBool>::SharedPtr pump_ctrl_cli_;
+
 };
 
-#endif // VACUUM_GRIPPER_CTLR_HPP__
+#endif // vacuum_gripper_HPP__

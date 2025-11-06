@@ -71,7 +71,13 @@ void NodeBase::reset_req_res(
   response.reset();
 }
 
-// ===================== send_sync_req std_msgs =====================
+// ===================== send_sync_req std_srvs =====================
+
+template bool NodeBase::send_sync_req<std_srvs::srv::Trigger>(
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr,
+  const std_srvs::srv::Trigger::Request::SharedPtr,
+  std_srvs::srv::Trigger::Response::SharedPtr&,
+  const std::string) const;
 
 template bool NodeBase::send_sync_req<std_srvs::srv::SetBool>(
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr,
@@ -85,6 +91,26 @@ template bool NodeBase::send_sync_req<robot_controller_msgs::srv::RobotSpeed>(
   rclcpp::Client<robot_controller_msgs::srv::RobotSpeed>::SharedPtr,
   const robot_controller_msgs::srv::RobotSpeed::Request::SharedPtr,
   robot_controller_msgs::srv::RobotSpeed::Response::SharedPtr&,
+  const std::string) const;
+template bool NodeBase::send_sync_req<robot_controller_msgs::srv::GetJointStates>(
+  rclcpp::Client<robot_controller_msgs::srv::GetJointStates>::SharedPtr,
+  const robot_controller_msgs::srv::GetJointStates::Request::SharedPtr,
+  robot_controller_msgs::srv::GetJointStates::Response::SharedPtr&,
+  const std::string) const;
+template bool NodeBase::send_sync_req<robot_controller_msgs::srv::GetJointLimits>(
+  rclcpp::Client<robot_controller_msgs::srv::GetJointLimits>::SharedPtr,
+  const robot_controller_msgs::srv::GetJointLimits::Request::SharedPtr,
+  robot_controller_msgs::srv::GetJointLimits::Response::SharedPtr&,
+  const std::string) const;
+template bool NodeBase::send_sync_req<robot_controller_msgs::srv::ExecuteJoints>(
+  rclcpp::Client<robot_controller_msgs::srv::ExecuteJoints>::SharedPtr,
+  const robot_controller_msgs::srv::ExecuteJoints::Request::SharedPtr,
+  robot_controller_msgs::srv::ExecuteJoints::Response::SharedPtr&,
+  const std::string) const;
+template bool NodeBase::send_sync_req<robot_controller_msgs::srv::ExecutePose>(
+  rclcpp::Client<robot_controller_msgs::srv::ExecutePose>::SharedPtr,
+  const robot_controller_msgs::srv::ExecutePose::Request::SharedPtr,
+  robot_controller_msgs::srv::ExecutePose::Response::SharedPtr&,
   const std::string) const;
 template bool NodeBase::send_sync_req<robot_controller_msgs::srv::ExecuteWaypoints>(
   rclcpp::Client<robot_controller_msgs::srv::ExecuteWaypoints>::SharedPtr,
@@ -116,10 +142,10 @@ template bool NodeBase::send_sync_req<robot_controller_msgs::srv::GetCollisionOb
   const robot_controller_msgs::srv::GetCollisionObjectsFromScene::Request::SharedPtr,
   robot_controller_msgs::srv::GetCollisionObjectsFromScene::Response::SharedPtr&,
   const std::string) const;
-template bool NodeBase::send_sync_req<robot_controller_msgs::srv::GetCurrentPose>(
-  rclcpp::Client<robot_controller_msgs::srv::GetCurrentPose>::SharedPtr,
-  const robot_controller_msgs::srv::GetCurrentPose::Request::SharedPtr,
-  robot_controller_msgs::srv::GetCurrentPose::Response::SharedPtr&,
+template bool NodeBase::send_sync_req<robot_controller_msgs::srv::GetPose>(
+  rclcpp::Client<robot_controller_msgs::srv::GetPose>::SharedPtr,
+  const robot_controller_msgs::srv::GetPose::Request::SharedPtr,
+  robot_controller_msgs::srv::GetPose::Response::SharedPtr&,
   const std::string) const;
 
   // ===================== send_sync_req robotic_platform_msgs =====================
@@ -144,13 +170,3 @@ template bool NodeBase::send_sync_req<robotic_platform_msgs::srv::PlacePlan>(
   const robotic_platform_msgs::srv::PlacePlan::Request::SharedPtr,
   robotic_platform_msgs::srv::PlacePlan::Response::SharedPtr&,
   const std::string) const;
-
-// ===================== reset_req_res =====================
-
-template void NodeBase::reset_req_res<std_srvs::srv::SetBool>(
-  std_srvs::srv::SetBool::Request::SharedPtr&,
-  std_srvs::srv::SetBool::Response::SharedPtr&) const;
-
-template void NodeBase::reset_req_res<robot_controller_msgs::srv::ExecuteWaypoints>(
-  robot_controller_msgs::srv::ExecuteWaypoints::Request::SharedPtr&,
-  robot_controller_msgs::srv::ExecuteWaypoints::Response::SharedPtr&) const;

@@ -33,6 +33,7 @@ find_package(Boost REQUIRED)
 
 find_package(robot_controller_msgs REQUIRED)
 find_package(robotic_platform_msgs REQUIRED)
+find_package(robostore_msgs REQUIRED)
 
 include_directories(
   include
@@ -40,35 +41,51 @@ include_directories(
 )
 
 set(common_files
+  src/node_base.cpp
   src/planner_base.cpp
   src/tf_broadcaster.cpp
 )
 
 set(manager_files
-  src/node_base.cpp
   src/manager/manager.cpp
+  src/manager/utils.cpp
+  src/manager/pick.cpp
+  src/manager/place.cpp
 )
 
 set(manipulation_files
-  src/manipulation/end_effector_ctrl/vacuum_gripper_ctlr.cpp
+  src/manipulation/end_effector_ctrl/vacuum_gripper.cpp
+
   src/manipulation/collision_planner/collision_planner.cpp
+
   src/manipulation/motion_planner/motion_planner.cpp
   src/manipulation/motion_planner/motion_impl.cpp
   src/manipulation/motion_planner/motion.cpp
+  src/manipulation/motion_planner/utils.cpp
+
   src/manipulation/workflow_planner/workflow_planner.cpp
   src/manipulation/workflow_planner/transformation.cpp
   src/manipulation/workflow_planner/utils.cpp
+  
+  src/manipulation/workflow_planner/strategy/elevation.cpp
   src/manipulation/workflow_planner/strategy/pick.cpp
+  src/manipulation/workflow_planner/strategy/place.cpp
   src/manipulation/workflow_planner/strategy/scan.cpp
-  src/manipulation/workflow_planner/action_server/pick_up.cpp
+
+  src/manipulation/workflow_planner/action_server/pick.cpp
+  src/manipulation/workflow_planner/action_server/place.cpp
   src/manipulation/workflow_planner/action_server/scan_sku.cpp
   src/manipulation/workflow_planner/action_server/replenish.cpp
+
   src/manipulation/action_planner/action_planner.cpp
   src/manipulation/action_planner/service_server/plan.cpp
+  
+  src/elevation/fold_elevator_driver.cpp
+  src/elevation/impl.cpp
+  src/elevation/utils.cpp
 )
 
 add_executable(platform_server 
-  src/node_base.cpp
   src/main.cpp
 
   ${common_files}
@@ -100,6 +117,7 @@ ament_target_dependencies(platform_server
 
   robot_controller_msgs
   robotic_platform_msgs
+  robostore_msgs
 )
 target_link_libraries(platform_server 
   ${YAML_CPP_LIBRARIES})

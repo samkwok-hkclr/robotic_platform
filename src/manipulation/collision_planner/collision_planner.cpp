@@ -14,11 +14,11 @@ CollisionPlanner::CollisionPlanner(
   get_parameter("import_from_file", import_from_file);
   get_parameter("collision_objects_file", file);
 
-  if (import_from_file && !get_col_obj_form_file(file))
-  {
-    rclcpp::shutdown();
-    return;
-  }
+  // if (import_from_file && !get_col_obj_form_file(file))
+  // {
+  //   rclcpp::shutdown();
+  //   return;
+  // }
 
   cli_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   timer_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);

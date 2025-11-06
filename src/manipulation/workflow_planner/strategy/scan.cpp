@@ -1,8 +1,10 @@
 #include "manipulation/workflow_planner/workflow_planner.hpp"
 
 std::optional<std::vector<robotic_platform_msgs::msg::ObjectPose>> WorkflowPlanner::try_to_scan(
-  const uint32_t sku_id, 
-  const uint8_t camera_id)
+  RobotArm arm,
+  const int32_t sku_id, 
+  const uint8_t camera_id,
+  const Pose& scan_pose)
 {
   auto scan_and_check = [&](uint32_t attempt_num) -> std::optional<std::vector<ObjectPose>> {
     // wait for image streaming become stable
@@ -36,34 +38,35 @@ std::optional<std::vector<robotic_platform_msgs::msg::ObjectPose>> WorkflowPlann
     return std::nullopt;
   };
 
-  // 1st attempt
-  if (scan_poses_.find(sku_id) != scan_poses_.end())
+  if (!motion_planner_->move_to_action_pose(arm, 100.0f)) 
   {
-    if (!motion_planner_->move_to(scan_poses_[sku_id], 20.0f)) 
-    {
-      RCLCPP_ERROR(get_logger(), "Failed to move to SKU [%d] position", sku_id);
-      return std::nullopt;
-    }
-
-    if (auto result = scan_and_check(1); result.has_value()) 
-    {
-      return result;
-    }
+    RCLCPP_ERROR(get_logger(), "Failed to move to action pose");
+    return std::nullopt;
   }
-  else if (auto result = scan_and_check(1); result.has_value()) 
+
+  if (!motion_planner_->move_to(arm, scan_pose, 100.0f)) 
+  {
+    RCLCPP_ERROR(get_logger(), "Failed to move to SKU [%d] position", sku_id);
+    return std::nullopt;
+  }
+  RCLCPP_ERROR(get_logger(), "%s arm move to SKU [%d] scan position", arm == RobotArm::LEFT ? "Left" : "Right", sku_id);
+
+  // 1st attempt
+  if (auto result = scan_and_check(1); result.has_value()) 
   {
     return result;
   }
 
   // Get current pose for offset calculations
-  std::optional<Pose> curr_pose = get_curr_pose("tcp");
-  if (!curr_pose.has_value()) 
+  auto tf_stamped = get_tf(ARM_REF_FRAME, arm == RobotArm::LEFT ? "left_tcp" : "right_tcp");
+  if (!tf_stamped.has_value())
   {
-    RCLCPP_ERROR(get_logger(), "Failed to get current pose");
     return std::nullopt;
   }
 
-  tf2::Transform g_b__tcp = get_g(curr_pose.value()); 
+  tf2::Transform g_b__tcp;
+  tf2::fromMsg(tf_stamped.value().transform, g_b__tcp);
+  print_g(g_b__tcp);
 
   for (uint16_t i = 0; i < max_scan_attempt_; i++) 
   {
@@ -75,7 +78,7 @@ std::optional<std::vector<robotic_platform_msgs::msg::ObjectPose>> WorkflowPlann
     
     Pose p = cvt_g_to_pose(g_b__tcp_offset);
     
-    if (!motion_planner_->move_to(p, 20.0f)) 
+    if (!motion_planner_->move_to(arm, p, 100.0f)) 
     {
       RCLCPP_ERROR(get_logger(), "Failed to move to offset position");
       continue; // Try next offset instead of giving up

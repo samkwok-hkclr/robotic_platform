@@ -8,6 +8,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 
+#include "std_srvs/srv/trigger.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 
 #include "geometry_msgs/msg/pose.hpp"
@@ -19,13 +20,18 @@
 #include "robotic_platform_msgs/srv/place_plan.hpp"
 
 #include "robot_controller_msgs/srv/execute_waypoints.hpp"
-#include "robot_controller_msgs/srv/get_current_pose.hpp"
+#include "robot_controller_msgs/srv/execute_joints.hpp"
+#include "robot_controller_msgs/srv/execute_pose.hpp"
+#include "robot_controller_msgs/srv/get_pose.hpp"
+#include "robot_controller_msgs/srv/get_joint_states.hpp"
+#include "robot_controller_msgs/srv/get_joint_limits.hpp"
 #include "robot_controller_msgs/srv/add_collision_objects.hpp"
 #include "robot_controller_msgs/srv/apply_attached_collision_objects.hpp"
 #include "robot_controller_msgs/srv/get_collision_objects_from_scene.hpp"
 #include "robot_controller_msgs/srv/move_collision_objects.hpp"
 #include "robot_controller_msgs/srv/remove_collision_objects.hpp"
 #include "robot_controller_msgs/srv/robot_speed.hpp"
+
 
 class NodeBase : public rclcpp::Node
 {

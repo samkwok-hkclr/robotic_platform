@@ -14,7 +14,6 @@
 
 #include "tf2/exceptions.h"
 #include "tf2/convert.h"
-
 #include "tf2/LinearMath/Transform.h"
 #include "tf2/LinearMath/Quaternion.h"
 
@@ -26,25 +25,19 @@
 #include "tf2_ros/buffer.h"
 
 #include "std_srvs/srv/set_bool.hpp"
-
 #include "geometry_msgs/msg/pose.hpp"
 #include "geometry_msgs/msg/transform_stamped.hpp"
 
-#include "robotic_platform_msgs/srv/get_slot_state_trigger.hpp"
-#include "robotic_platform_msgs/srv/get_object_pose_trigger.hpp"
-#include "robotic_platform_msgs/srv/pick_plan.hpp"
-#include "robotic_platform_msgs/srv/place_plan.hpp"
-
-#include "robot_controller_msgs/srv/execute_waypoints.hpp"
-#include "robot_controller_msgs/srv/get_current_pose.hpp"
-#include "robot_controller_msgs/srv/add_collision_objects.hpp"
-#include "robot_controller_msgs/srv/apply_attached_collision_objects.hpp"
-#include "robot_controller_msgs/srv/get_collision_objects_from_scene.hpp"
-#include "robot_controller_msgs/srv/move_collision_objects.hpp"
-#include "robot_controller_msgs/srv/remove_collision_objects.hpp"
-#include "robot_controller_msgs/srv/robot_speed.hpp"
-
 #include "node_base.hpp"
+
+enum RobotArm : uint8_t
+{
+  LEFT = 1,
+  RIGHT,
+  WHOLE,
+
+  LAST // should not be assigned
+};
 
 class PlannerBase : public NodeBase
 {
@@ -61,20 +54,30 @@ public:
   void print_g(const tf2::Transform& g) const;
   Pose cvt_g_to_pose(const tf2::Transform& g) const;
 
-	virtual Pose compose_pose_msg(const std::vector<double>& pose_vec);
+	virtual Pose compose_pose_msg(const std::vector<double>& pose_vec) const;
 
 	virtual void pose_translation(Pose::SharedPtr pose, float x, float y, float z);
 
-  virtual void print_pose(const Pose& pose);
-  virtual void print_pose_arr(const std::vector<Pose>& poses);
+  virtual void print_pose(const Pose& pose) const;
+  virtual void print_pose_arr(const std::vector<Pose>& poses) const;
 
   virtual bool are_poses_closed(
     const Pose& pose_1,
     const Pose& pose_2, 
     double pos_thd = 1e-5, 
-    double ori_thd = 1e-5);
+    double ori_thd = 1e-5) const;
+
+  TransformStamped create_transform(
+    const Pose& msg, 
+    const std::string& parent_frame,
+    const std::string& child_frame);
 
   virtual void send_transform(
+    const Pose& pose, 
+    const std::string& parent_frame,
+    const std::string& child_frame);
+
+  virtual void send_static_transform(
     const Pose& pose, 
     const std::string& parent_frame,
     const std::string& child_frame);
@@ -83,11 +86,33 @@ public:
     const std::string& to_frame, 
     const std::string& from_frame);
 
+  inline static const std::map<RobotArm, std::string> arm_to_str = {
+    { RobotArm::LEFT, "left_arm" },
+    { RobotArm::RIGHT, "right_arm" },
+    { RobotArm::WHOLE, "whole_arm" }
+  };
+
+  inline static const std::map<std::string, RobotArm> str_to_arm = {
+    { "left", RobotArm::LEFT } ,
+    { "left_arm", RobotArm::LEFT } ,
+
+    { "right", RobotArm::RIGHT },
+    { "right_arm", RobotArm::RIGHT },
+
+    { "whole", RobotArm::WHOLE },
+    { "whole_arm", RobotArm::WHOLE }
+  };
+
+  const std::string BASE_LINK = "base_link";
+  const std::string BASE_FOOTPRINT = "base_footprint";
+  const std::string OBJECT_POSE = "object_pose";
+  const std::string ARM_REF_FRAME = "link4";
+
 private:  
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;
-  std::shared_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_broadcaster_;
+  std::unique_ptr<tf2_ros::StaticTransformBroadcaster> tf_static_broadcaster_;
 
-  std::shared_ptr<tf2_ros::TransformListener> transform_listener_{nullptr};
+  std::unique_ptr<tf2_ros::TransformListener> transform_listener_;
   std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
 
 };
