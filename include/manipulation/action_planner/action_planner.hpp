@@ -57,7 +57,6 @@ private:
   
   std::vector<std::tuple<Pose, std::string, std::string>> tf_buf_;
 
-  rclcpp::CallbackGroup::SharedPtr tf_timer_cbg_;
   rclcpp::CallbackGroup::SharedPtr srv_ser_cbg_;
 
   rclcpp::TimerBase::SharedPtr tf_pub_timer;

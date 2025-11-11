@@ -8,9 +8,13 @@ bool MotionPlanner::try_to_pick(
   switch (arm)
   {
     case RobotArm::LEFT:  
-      return try_to_pick_by_vac(pre_pick_pose, pick_poses);
+      return try_to_pick_by_vac(RobotArm::LEFT, pre_pick_pose, pick_poses);
+    case RobotArm::LEFT_ACTION:  
+      return try_to_pick_by_vac(RobotArm::LEFT_ACTION, pre_pick_pose, pick_poses);
     case RobotArm::RIGHT:
-      return false;
+      return try_to_pick_by_finger(RobotArm::RIGHT, pre_pick_pose, pick_poses);
+    case RobotArm::RIGHT_ACTION:
+      return try_to_pick_by_finger(RobotArm::RIGHT_ACTION, pre_pick_pose, pick_poses);
     default:
       return false;
   }
@@ -25,9 +29,13 @@ bool MotionPlanner::try_to_place(
   switch (arm)
   {
     case RobotArm::LEFT:
-      return try_to_place_by_vac(pre_pick_pose, pick_poses, max_retries);
+      return try_to_place_by_vac(RobotArm::LEFT, pre_pick_pose, pick_poses, max_retries);
+    case RobotArm::LEFT_ACTION:  
+      return try_to_place_by_vac(RobotArm::LEFT_ACTION, pre_pick_pose, pick_poses, max_retries);
     case RobotArm::RIGHT:
-      return false;
+      return try_to_place_by_finger(RobotArm::RIGHT, pre_pick_pose, pick_poses, max_retries);
+    case RobotArm::RIGHT_ACTION:
+      return try_to_place_by_finger(RobotArm::RIGHT_ACTION, pre_pick_pose, pick_poses, max_retries);
     default:
       return false;
   }
@@ -38,9 +46,11 @@ bool MotionPlanner::gripper_action(RobotArm arm, const bool cmd)
   switch(arm)
   {
     case RobotArm::LEFT:  
+    case RobotArm::LEFT_ACTION:  
       return vac_gripper_->gripper_action(cmd);
     case RobotArm::RIGHT:
-      return false;
+    case RobotArm::RIGHT_ACTION:
+      return finger_gripper_->gripper_action(100, cmd ? 0.0 : 95.0);
     default:
       return false;
   }

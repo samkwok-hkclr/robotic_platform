@@ -29,8 +29,6 @@ Manager::Manager(
       srv_cli_cbg_);
   }
 
-  const std::array<RobotArm, 2> all_arms = {RobotArm::LEFT, RobotArm::RIGHT};
-
   for (RobotArm arm : all_arms)
   {
     std::unordered_map<std::string, rclcpp::Client<Trigger>::SharedPtr> arm_map;
@@ -111,15 +109,16 @@ void Manager::new_order_cb(
     //   return;
     // }
 
+    RCLCPP_INFO(this->get_logger(), "Step 7: Rotate to front");
     if (!rotate_to("abs_front"))
     {
       RCLCPP_ERROR(this->get_logger(), "abs_front");
       return;
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     
-    // Step 4: Pick item
+    RCLCPP_INFO(this->get_logger(), "Step 4: Pick item");
     std::optional<std::map<uint8_t, double>> opt_results = send_pick_goal(order_items, selected_indices);
 
     if (!opt_results.has_value()) 
@@ -141,15 +140,17 @@ void Manager::new_order_cb(
     //   return;
     // }
 
-    if (!rotate_to("relative_back"))
+    RCLCPP_INFO(this->get_logger(), "Step 7: Rotate to relative back");
+    if (!rotate_to("abs_back"))
     {
-      RCLCPP_ERROR(this->get_logger(), "relative_back");
+      RCLCPP_ERROR(this->get_logger(), "abs_back");
       return;
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // Step 7: Place all carried items
+    RCLCPP_INFO(this->get_logger(), "Step 7: Place all carried items");
     if (!send_place_goal(order_items, selected_indices, table_id, place_height)) 
     {
       RCLCPP_ERROR(this->get_logger(), "Failed to place item SKU");
@@ -169,9 +170,9 @@ void Manager::new_order_cb(
     for (size_t idx : selected_indices) 
     {
       if (items_completed[idx] && order_items[idx].sku.is_suctionable)
-        move_to_basic_pose(RobotArm::LEFT, "home");
+        move_to_basic_pose(RobotArm::LEFT_ACTION, "home");
       else if (items_completed[idx] && order_items[idx].sku.is_grippable)
-        move_to_basic_pose(RobotArm::RIGHT, "home");
+        move_to_basic_pose(RobotArm::RIGHT_ACTION, "home");
     }
 
     // Step 8: Check if all items are finished

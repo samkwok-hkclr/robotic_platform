@@ -2,7 +2,8 @@
 
 bool MotionPlanner::pick(RobotArm arm, const PickPlanResult& plan, const float speed)
 {
-  if (!move_to(arm, plan.pre_pick_pose, speed))
+  RCLCPP_WARN(get_logger(), "Move to pre-pick pose");
+  if (!move_to(arm, plan.pre_pick_pose, speed / 2.0))
   {
     return false;
   }
@@ -58,9 +59,11 @@ bool MotionPlanner::move_to_zero_pose(RobotArm arm, const float speed)
 
 bool MotionPlanner::move_to_home_pose(RobotArm arm, const float speed)
 {
-  if (home_joint_pose_.find(arm) != home_joint_pose_.end()) 
+  RobotArm arm_wo_rototion = arm_remove_rotation(arm);
+
+  if (home_joint_pose_.find(arm_wo_rototion) != home_joint_pose_.end()) 
   {
-    return move_to(arm, home_joint_pose_[arm], speed);
+    return move_to(arm_wo_rototion, home_joint_pose_[arm_wo_rototion], speed);
   }
   
   return false;
@@ -68,9 +71,11 @@ bool MotionPlanner::move_to_home_pose(RobotArm arm, const float speed)
 
 bool MotionPlanner::move_to_holding_pose(RobotArm arm, const float speed)
 {
-  if (holding_joint_pose_.find(arm) != holding_joint_pose_.end()) 
+  RobotArm arm_wo_rototion = arm_remove_rotation(arm);
+
+  if (holding_joint_pose_.find(arm_wo_rototion) != holding_joint_pose_.end()) 
   {
-    return move_to(arm, holding_joint_pose_[arm], speed);
+    return move_to(arm_wo_rototion, holding_joint_pose_[arm_wo_rototion], speed);
   }
   
   return false;
@@ -78,10 +83,32 @@ bool MotionPlanner::move_to_holding_pose(RobotArm arm, const float speed)
 
 bool MotionPlanner::move_to_action_pose(RobotArm arm, const float speed)
 {
-  if (action_joint_pose_.find(arm) != action_joint_pose_.end()) 
+  RobotArm arm_wo_rototion = arm_remove_rotation(arm);
+
+  if (action_joint_pose_.find(arm_wo_rototion) != action_joint_pose_.end()) 
   {
-    return move_to(arm, action_joint_pose_[arm], speed);
+    return move_to(arm_wo_rototion, action_joint_pose_[arm_wo_rototion], speed);
   }
   
   return false;
+}
+
+RobotArm MotionPlanner::arm_remove_rotation(RobotArm arm)
+{
+  RobotArm arm_wo_rototion;
+
+  switch (arm)
+  { 
+    case RobotArm::LEFT_ACTION:
+      arm_wo_rototion = RobotArm::LEFT;
+      break;
+    case RobotArm::RIGHT_ACTION:
+      arm_wo_rototion = RobotArm::RIGHT;
+      break;
+    default:
+      arm_wo_rototion = arm;
+      break;
+  }
+
+  return arm_wo_rototion;
 }

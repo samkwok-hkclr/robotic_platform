@@ -15,8 +15,8 @@ std::optional<std::map<uint8_t, double>> Manager::send_pick_goal(
   {
     PickTask task;
     
-    task.arm_id = order_items[i].sku.is_suctionable ? LEFT_ARM : RIGHT_ARM;
-    task.camera_id = order_items[i].sku.is_suctionable ? LEFT_ARM : RIGHT_ARM;
+    task.arm_id = order_items[i].sku.is_suctionable ? RobotArm::LEFT_ACTION : RobotArm::RIGHT_ACTION;
+    task.camera_id = order_items[i].sku.is_suctionable ? RobotArm::LEFT_ACTION : RobotArm::RIGHT_ACTION;
     task.sku_id = order_items[i].sku.id;
     task.rack.id = order_items[i].rack.id;
     task.rack.shelf_level = order_items[i].rack.shelf_level;

@@ -64,7 +64,7 @@ void WorkflowPlanner::pick_execution(const std::shared_ptr<GoalHandlerPick> goal
     RCLCPP_DEBUG(get_logger(), "what should i publish?");
     goal_handle->publish_feedback(feedback);
   };
-  
+
   rclcpp::TimerBase::SharedPtr pub_fb_timer = create_wall_timer(std::chrono::seconds(1), pub_fb, exec_timer_cbg_);
   clear_tf_buf();
 
@@ -73,18 +73,33 @@ void WorkflowPlanner::pick_execution(const std::shared_ptr<GoalHandlerPick> goal
   for (const auto& [arm_id, camera_id, sku_id, rack, dimension] : goal->tasks) 
   {
     const RobotArm arm = static_cast<RobotArm>(arm_id);
-
+    
     PickResult msg;
     msg.arm_id = arm_id;
 
+    if (!set_camera_lifecycle(arm, true))
+    {
+      RCLCPP_ERROR(get_logger(), "Failed to activate camera");
+      msg.success = false;
+      msg.message = "Failed to activate camera";
+      result->results.emplace_back(msg);
+      continue;
+    }
+
+    // FIXME: wait for tf tree be stable
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
     if (!optimal_pick_elvation(rack))
     {
-      RCLCPP_INFO(get_logger(), "Failed to elevate to rack id: [%d], shelf level: %d", rack.id, rack.shelf_level);
+      RCLCPP_ERROR(get_logger(), "Failed to elevate to rack id: [%d], shelf level: %d", rack.id, rack.shelf_level);
+      msg.success = false;
+      msg.message = "FIXME";
+      result->results.emplace_back(msg);
       continue;
     }
     
     RCLCPP_INFO(get_logger(), "Attempting pick-up: arm=%s, sku=%d, rack=%d, shelf_level=%d, shelf_slot=%d", 
-      arm == RobotArm::LEFT ? "left" : "right",
+      arm_to_str.at(arm).c_str(),
       sku_id, 
       rack.id, 
       rack.shelf_level, 
@@ -94,16 +109,17 @@ void WorkflowPlanner::pick_execution(const std::shared_ptr<GoalHandlerPick> goal
  
     if (height.has_value())
     {
+      clear_tf_buf();
       msg.success = true;
       msg.height = height.value();
       state += 1;
-      RCLCPP_INFO(get_logger(), "Successfully picked up SKU %d using %s arm", sku_id, arm == RobotArm::LEFT ? "left" : "right");
+      RCLCPP_INFO(get_logger(), "Successfully picked up SKU %d using %s arm", sku_id, arm_to_str.at(arm).c_str());
     }
     else
     {
       msg.success = false;
       msg.message = "FIXME";
-      RCLCPP_WARN(get_logger(), "Failed to pick up SKU %d using %s arm", sku_id, arm == RobotArm::LEFT ? "left" : "right");
+      RCLCPP_ERROR(get_logger(), "Failed to pick up SKU %d using %s arm", sku_id, arm_to_str.at(arm).c_str());
     }
 
     result->results.emplace_back(msg);
@@ -113,7 +129,16 @@ void WorkflowPlanner::pick_execution(const std::shared_ptr<GoalHandlerPick> goal
       motion_planner_->move_to_holding_pose(arm, 100.0);
     }
 
-    RCLCPP_INFO(get_logger(), "SKU %d using %s arm", sku_id, arm == RobotArm::LEFT ? "left" : "right");
+    if (!set_camera_lifecycle(arm, false))
+    {
+      RCLCPP_ERROR(get_logger(), "Failed to deactivate camera");
+      msg.success = false;
+      msg.message = "Failed to deactivate camera";
+      result->results.emplace_back(msg);
+      continue;
+    }
+
+    RCLCPP_INFO(get_logger(), "SKU %d using %s arm", sku_id, arm_to_str.at(arm).c_str());
   }
 
   RCLCPP_INFO(get_logger(), "Pick action completed successful, final state=%d", state);

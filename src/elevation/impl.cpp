@@ -153,7 +153,7 @@ bool FoldElevatorDriver::rotate_by_pose(double yaw, std::string* message)
   print_pose(req->pose);
 
   ExecutePose::Response::SharedPtr res;
-  if (!send_sync_req<ExecutePose>(exec_pose_cli_, req, res, __FUNCTION__))
+  if (!send_sync_req<ExecutePose>(exec_pose_cli_, std::move(req), res, __FUNCTION__))
   {
     RCLCPP_ERROR(get_logger(), "Sent ExecutePose request failed");
     return false;
@@ -253,17 +253,41 @@ tf2::Quaternion FoldElevatorDriver::clean_quat(const tf2::Quaternion& quat_in, d
 
   if (!quat.normalized()) 
     quat.normalize();
+
+  const double components[4] = {quat.x(), quat.y(), quat.z(), quat.w()};
+
+  for (int i = 0; i < 3; ++i) 
+  { // Check x, y, z axes
+    bool is_pure_rotation = true;
+    
+    for (int j = 0; j < 4; ++j) 
+    {
+      double expected = (j == i) ? 1.0 : 0.0; // This component should be ~1, others ~0
+      if (std::abs(std::abs(components[j]) - expected) > threshold) 
+      {
+        is_pure_rotation = false;
+        break;
+      }
+    }
+    
+    if (is_pure_rotation) 
+    {
+      // Found a pure axis rotation, return canonical form
+      tf2::Quaternion result(0.0, 0.0, 0.0, 0.0);
+      result[i] = 1.0; // Set the appropriate axis component to 1
+      return result;
+    }
+  }
   
+  // Check identity case
   if (std::abs(quat.x()) < threshold && 
       std::abs(quat.y()) < threshold && 
       std::abs(quat.z()) < threshold && 
-      std::abs(quat.w() - 1.0) < threshold) 
+      std::abs(std::abs(quat.w()) - 1.0) < threshold) 
   {
-    quat.setX(0.0);
-    quat.setY(0.0);
-    quat.setZ(0.0);
-    quat.setW(1.0);
+    return tf2::Quaternion(0.0, 0.0, 0.0, 1.0);
   }
 
   return quat;
 }
+

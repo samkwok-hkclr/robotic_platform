@@ -31,9 +31,9 @@ void TfBroadcaster::setup_static_tf()
 
   std::vector<ShelfDefinition> all_shelves = {
     {"rack_1", "shelf_1", { }},
-    {"rack_1", "shelf_2", { 0.37 }},
-    {"rack_1", "shelf_3", { 0.22, 0.37, 0.79 }},
-    {"rack_1", "shelf_4", { 0.22, 0.37, 0.85 }},
+    {"rack_1", "shelf_2", { 0.22, 0.37, 0.90 }},
+    {"rack_1", "shelf_3", { 0.22, 0.37, 0.90 }},
+    {"rack_1", "shelf_4", { 0.22, 0.37, 0.90 }},
     // {"rack_2", "shelf_2", {0.1, 0.15, 0.25, 0.4}}, // Irregular spacing
   };
 

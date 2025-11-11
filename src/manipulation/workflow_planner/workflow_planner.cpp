@@ -44,6 +44,7 @@ WorkflowPlanner::WorkflowPlanner(
   action_ser_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   vision_srv_cli_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   plan_srv_cli_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  cam_srv_cli_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   exec_timer_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   tf_timer_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
@@ -56,6 +57,19 @@ WorkflowPlanner::WorkflowPlanner(
     "debug_function", 
     10, 
     std::bind(&WorkflowPlanner::debug_cb, this, _1));
+
+  const std::vector<std::pair<RobotArm, std::string>> camera_srv = {
+    { RobotArm::LEFT,  "/left_camera/realsense/change_state" },
+    { RobotArm::RIGHT, "/right_camera/realsense/change_state" }
+  };
+
+  for (const auto& cam : camera_srv)
+  {
+    camera_cli_[cam.first] = create_client<ChangeState>(
+      cam.second, 
+      rmw_qos_profile_services_default,
+      cam_srv_cli_cbg_);
+  }
 
   get_slot_state_tri_cli_ = create_client<GetSlotStateTrigger>(
     "get_slot_state_trigger", 

@@ -12,7 +12,7 @@ std::optional<double> WorkflowPlanner::try_to_pick_up(
 
   for (; attempt <= max_pick_attempt_; attempt++)
   {
-    RCLCPP_INFO(get_logger(), "attempt [%d]: try to pick up item %d", attempt, sku_id);
+    RCLCPP_INFO(get_logger(), "Attempt [%d]: try to pick up item %d", attempt, sku_id);
 
     RCLCPP_WARN(get_logger(), "get scan pose <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
     std::optional<geometry_msgs::msg::Pose> scan_pose = get_scan_pose(rack.id, rack.shelf_level, rack.shelf_slot);
@@ -60,7 +60,7 @@ std::optional<double> WorkflowPlanner::try_to_pick_up(
       push_tf_buf(std::make_tuple(pose, ARM_REF_FRAME, "pick_poses_" + std::to_string(i++)));
     });
 
-    if (motion_planner_->pick(arm, pick_plan_result.value(), 100.0f))
+    if (motion_planner_->pick(arm, pick_plan_result.value(), 50.0f))
     {
       success = true;
       break;

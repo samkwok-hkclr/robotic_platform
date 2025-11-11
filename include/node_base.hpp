@@ -18,6 +18,7 @@
 #include "robotic_platform_msgs/srv/get_object_pose_trigger.hpp"
 #include "robotic_platform_msgs/srv/pick_plan.hpp"
 #include "robotic_platform_msgs/srv/place_plan.hpp"
+#include "robotic_platform_msgs/srv/control_gripper.hpp"
 
 #include "robot_controller_msgs/srv/execute_waypoints.hpp"
 #include "robot_controller_msgs/srv/execute_joints.hpp"

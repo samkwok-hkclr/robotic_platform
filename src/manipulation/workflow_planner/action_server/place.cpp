@@ -79,16 +79,22 @@ void WorkflowPlanner::place_execution(const std::shared_ptr<GoalHandlerPlace> go
     if (height <= place_offset_)
     {
       RCLCPP_WARN(get_logger(), "Height (%.4f) should not be less than or equal to place_offset_ (%.4f) in %s arm", 
-        height, place_offset_, arm == RobotArm::LEFT ? "left" : "right");
+        height, place_offset_, arm_to_str.at(arm).c_str());
       msg.message = "Invalid height - below safety threshold";
       msg.success = false;
       result->results.emplace_back(msg);
       continue;
     }
 
+    // FIXME: wait for tf tree be stable
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
     if (!optimal_place_elvation(table))
     {
-      RCLCPP_INFO(get_logger(), "Failed to elevate to Table id: [%d], index: %d", table.id, table.index);
+      RCLCPP_ERROR(get_logger(), "Failed to elevate to Table id: [%d], index: %d", table.id, table.index);
+      msg.message = "Failed to elevate to Table";
+      msg.success = false;
+      result->results.emplace_back(msg);
       continue;
     }
 
@@ -98,32 +104,39 @@ void WorkflowPlanner::place_execution(const std::shared_ptr<GoalHandlerPlace> go
       msg.success = false;
       msg.message = "Placement operation failed";
       result->results.emplace_back(msg);
+      continue;
     }
 
     RCLCPP_INFO(get_logger(), "Attempting place-down: arm=%s, sku=%d, table=%d, table order=%d", 
-      arm == RobotArm::LEFT ? "left" : "right",
+      arm_to_str.at(arm).c_str(),
       sku_id, 
       table.id, 
       table.index);
 
-    bool success = try_to_place_down(arm, height, table);
+    bool success = try_to_place_down(arm, height + 0.04, table);
  
+    clear_tf_buf();
+
     if (success)
     {
+      if (!motion_planner_->move_to_action_pose(arm, 100.0f))
+      {
+        RCLCPP_ERROR(get_logger(), "Failed to move to action pose");
+        msg.success = false;
+        msg.message = "Placement operation failed";
+        result->results.emplace_back(msg);
+        continue;
+      };
+
       msg.success = true;
       state += 1;
-      RCLCPP_INFO(get_logger(), "Successfully placed down SKU %d using %s arm", sku_id, arm == RobotArm::LEFT ? "left" : "right");
+      RCLCPP_INFO(get_logger(), "Successfully placed down SKU %d using %s arm", sku_id, arm_to_str.at(arm).c_str());
     }
     else
     {
       msg.success = false;
       msg.message = "Placement operation failed";
-      RCLCPP_WARN(get_logger(), "Failed to place down SKU %d using %s arm", sku_id, arm == RobotArm::LEFT ? "left" : "right");
-    }
-
-    if (success)
-    {
-      motion_planner_->move_to_action_pose(arm, 100.0);
+      RCLCPP_WARN(get_logger(), "Failed to place down SKU %d using %s arm", sku_id, arm_to_str.at(arm).c_str());
     }
 
     result->results.emplace_back(msg);

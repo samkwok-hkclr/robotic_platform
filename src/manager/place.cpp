@@ -26,11 +26,14 @@ bool Manager::send_place_goal(
   {
     PlaceTask task;
     
-    task.arm_id = order_items[i].sku.is_suctionable ? LEFT_ARM : RIGHT_ARM;
+    task.arm_id = order_items[i].sku.is_suctionable ? RobotArm::LEFT_ACTION : RobotArm::RIGHT_ACTION;
     task.sku_id = order_items[i].sku.id;
-    task.height = place_height.at(order_items[i].sku.is_suctionable ? LEFT_ARM : RIGHT_ARM); 
+    task.height = place_height.at(order_items[i].sku.is_suctionable ? RobotArm::LEFT_ACTION : RobotArm::RIGHT_ACTION); 
     task.table.id = table_id;
-    task.table.index = i + 1; // FIXME!
+    if (order_items[i].sku.is_suctionable)
+      task.table.index = i + 1; //i + 1; // FIXME!
+    else
+      task.table.index = order_items.size() + 1; //i + 1; // FIXME!
     
     goal_msg.tasks.push_back(task);
   }

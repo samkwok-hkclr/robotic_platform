@@ -33,6 +33,7 @@
 
 struct CollisionObject 
 {
+  std::string frame_id;
   int id;
   int type;
   std::string name;
@@ -62,9 +63,9 @@ public:
 
   bool get_col_obj_form_file(std::string file);
 
-  bool get_col_obj_from_scene(std::vector<std::string>& object_ids);
-  bool add_col_obj(const std::vector<std::string>& existed_object_ids);
-  bool add_col_obj(const moveit_msgs::msg::CollisionObject::SharedPtr object);
+  bool get_col_obj_from_scene(RobotArm arm, std::vector<std::string>& object_ids);
+  bool add_col_obj(RobotArm arm, const std::vector<std::string>& existed_object_ids);
+  bool add_col_obj(RobotArm arm, const moveit_msgs::msg::CollisionObject::SharedPtr object);
   bool remove_col_obj(const std::vector<std::string>& existed_object_ids);
 
   void init_cb(void);
@@ -81,7 +82,7 @@ public:
 private:
   std::mutex mutex_;
 
-  bool sim_;
+  bool simulation_;
 
   std::vector<CollisionObject> collision_objects_;
 
@@ -92,11 +93,12 @@ private:
   rclcpp::TimerBase::SharedPtr status_timer_;
   rclcpp::TimerBase::SharedPtr col_obj_sync_timer_;
 
-  rclcpp::Client<AddCollisionObjects>::SharedPtr add_col_obj_cli_;
-  rclcpp::Client<RemoveCollisionObjects>::SharedPtr remove_col_obj_cli_;
-  rclcpp::Client<ApplyAttachedCollisionObjects>::SharedPtr apply_attach_col_obj_cli_;
-  rclcpp::Client<MoveCollisionObjects>::SharedPtr move_col_obj_cli_;
-  rclcpp::Client<GetCollisionObjectsFromScene>::SharedPtr get_col_obj_from_secne_cli_;
+  std::map<RobotArm, rclcpp::Client<AddCollisionObjects>::SharedPtr> add_col_obj_cli_;
+  std::map<RobotArm, rclcpp::Client<RemoveCollisionObjects>::SharedPtr> remove_col_obj_cli_;
+  std::map<RobotArm, rclcpp::Client<ApplyAttachedCollisionObjects>::SharedPtr> apply_attach_col_obj_cli_;
+  std::map<RobotArm, rclcpp::Client<MoveCollisionObjects>::SharedPtr> move_col_obj_cli_;
+  std::map<RobotArm, rclcpp::Client<GetCollisionObjectsFromScene>::SharedPtr> get_col_obj_from_secne_cli_;
+
 
 };
 

@@ -101,8 +101,6 @@ private:
   void pick_feedback_cb(PickGoalHandle::SharedPtr, const std::shared_ptr<const Pick::Feedback> feedback);
   void place_feedback_cb(PlaceGoalHandle::SharedPtr, const std::shared_ptr<const Place::Feedback> feedback);
 
-  constexpr static uint8_t LEFT_ARM = 1;
-  constexpr static uint8_t RIGHT_ARM = 2;
   constexpr static std::chrono::duration ACTION_TIMEOUT = std::chrono::seconds(180);
   constexpr static std::chrono::duration CLI_REQ_TIMEOUT = std::chrono::seconds(30);
 };

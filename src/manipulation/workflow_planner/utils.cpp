@@ -66,7 +66,67 @@ std::optional<robotic_platform_msgs::msg::PlacePlanResult> WorkflowPlanner::get_
   return std::make_optional(std::move(response->result));
 }
 
+bool WorkflowPlanner::set_camera_lifecycle(RobotArm arm, bool activate)
+{
+  RobotArm arm_wo_action;
 
+  if (arm == RobotArm::LEFT_ACTION)
+    arm_wo_action = RobotArm::LEFT;
+  else if (arm == RobotArm::RIGHT_ACTION)
+    arm_wo_action = RobotArm::RIGHT;
+  else
+    arm_wo_action = arm;
+
+  const std::string srv_name = "change_state";
+
+  uint8_t retry = 0;
+  const uint8_t SRV_CLI_MAX_RETIES = 5;
+
+  while (rclcpp::ok() && !camera_cli_[arm_wo_action]->wait_for_service(std::chrono::milliseconds(100)))
+  {
+    if (retry >= SRV_CLI_MAX_RETIES)
+    {
+      RCLCPP_DEBUG(get_logger(), "Interrupted while waiting for the service. Exiting.");
+      return false;
+    }
+
+    RCLCPP_DEBUG(get_logger(), "%s service not available, waiting again...", srv_name.c_str());
+    retry++;
+  }
+
+  auto request = std::make_shared<ChangeState::Request>();
+  
+  if (activate)
+    request->transition.id = Transition::TRANSITION_ACTIVATE;
+  else
+    request->transition.id = Transition::TRANSITION_DEACTIVATE;
+
+  auto future = camera_cli_[arm_wo_action]->async_send_request(request);
+  std::future_status status = future.wait_for(get_cli_req_timeout());
+
+  switch (status)
+  {
+  case std::future_status::ready:
+    RCLCPP_DEBUG(get_logger(), "call service %s successfully", srv_name.c_str());
+    break;
+  case std::future_status::deferred:
+    RCLCPP_INFO(get_logger(), "Failed to call service %s, status: %s", srv_name.c_str(), "deferred");
+    return false;
+  case std::future_status::timeout:
+    RCLCPP_INFO(get_logger(), "Failed to call service %s, status: %s", srv_name.c_str(), "timeout");
+    return false;
+  }
+
+  auto response = future.get();
+
+  if (!response->success)
+  {
+    RCLCPP_INFO(get_logger(), "Service %s call failed", srv_name.c_str());
+    return false;
+  }
+
+  return true;
+}
 // std::optional<geometry_msgs::msg::Pose> WorkflowPlanner::get_curr_pose(RobotArm arm, const std::string& joint_name)
 // {
 //   if (joint_name.empty()) 

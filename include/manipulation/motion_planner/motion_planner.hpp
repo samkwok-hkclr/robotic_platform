@@ -9,6 +9,7 @@
 #include <chrono>
 #include <algorithm>
 #include <string_view>
+#include <random>
 
 #include <yaml-cpp/yaml.h>
 #include <Eigen/Geometry>
@@ -34,6 +35,7 @@
 #include "planner_base.hpp"
 #include "manipulation/poses_loader.hpp"
 #include "manipulation/end_effector_ctrl/vacuum_gripper.hpp"
+#include "manipulation/end_effector_ctrl/finger_gripper.hpp"
 
 using std::placeholders::_1;
 using std::placeholders::_2;
@@ -51,6 +53,7 @@ class MotionPlanner : public PlannerBase
   using PickPlanResult = robotic_platform_msgs::msg::PickPlanResult;
   using PlacePlanResult = robotic_platform_msgs::msg::PlacePlanResult;
 
+  using GetJointLimits = robot_controller_msgs::srv::GetJointLimits;
   using ExecuteJoints = robot_controller_msgs::srv::ExecuteJoints;
   using ExecutePose = robot_controller_msgs::srv::ExecutePose;
   using ExecuteWaypoints = robot_controller_msgs::srv::ExecuteWaypoints;
@@ -60,8 +63,12 @@ class MotionPlanner : public PlannerBase
 public:
   explicit MotionPlanner(
     const rclcpp::NodeOptions& options,
-    std::shared_ptr<VacuumGripper> gripper);
+    std::shared_ptr<VacuumGripper> vac_gripper,
+    std::shared_ptr<FingerGripper> finger_gripper);
   ~MotionPlanner();
+
+  
+  RobotArm arm_remove_rotation(RobotArm arm);
 
   bool pick(RobotArm arm, const PickPlanResult& plan, const float speed);
   bool place(RobotArm arm, const PlacePlanResult& plan, const float speed);
@@ -75,6 +82,10 @@ public:
   bool move_to(RobotArm arm, const Pose& pose, const float speed);
   bool move_to(RobotArm arm, const std::vector<Pose>& waypoints, const float speed);
 
+  void testing_cb(
+    const std::shared_ptr<Trigger::Request> request, 
+    std::shared_ptr<Trigger::Response> response);
+
   bool try_to_pick(
     RobotArm arm,
     const Pose& pre_pick_pose, 
@@ -82,9 +93,17 @@ public:
   
   // left arm
   bool try_to_pick_by_vac(
+    RobotArm arm, 
     const Pose& pre_pick_pose, 
     const std::vector<Pose>& pick_poses, 
     const std::chrono::milliseconds leak_check_duration = std::chrono::milliseconds(500));
+
+  // right arm
+  bool try_to_pick_by_finger(
+    RobotArm arm, 
+    const Pose& pre_pick_pose, 
+    const std::vector<Pose>& pick_poses,
+    const std::chrono::milliseconds holding_check_duration = std::chrono::milliseconds(500));
 
   bool try_to_place(
     RobotArm arm,
@@ -94,6 +113,14 @@ public:
 
   // left arm
   bool try_to_place_by_vac(
+    RobotArm arm, 
+    const Pose& pre_place_pose, 
+    const std::vector<Pose>& place_poses,
+    const uint8_t max_retries);
+
+  // right arm
+  bool try_to_place_by_finger(
+    RobotArm arm, 
     const Pose& pre_place_pose, 
     const std::vector<Pose>& place_poses,
     const uint8_t max_retries);
@@ -120,6 +147,8 @@ private:
   uint16_t max_pick_attempt_;
   
   std::shared_ptr<VacuumGripper> vac_gripper_;
+  std::shared_ptr<FingerGripper> finger_gripper_;
+
   std::map<RobotArm, std::vector<double>> zero_joint_pose_;
   std::map<RobotArm, std::vector<double>> home_joint_pose_;
   std::map<RobotArm, std::vector<double>> holding_joint_pose_;
@@ -134,12 +163,15 @@ private:
 
   // ============== Services Clients ==============
 
+  std::map<RobotArm, rclcpp::Client<GetJointLimits>::SharedPtr>  get_joint_limits_cli_;
+
   std::map<RobotArm, rclcpp::Client<ExecuteJoints>::SharedPtr> exec_joints_cli_;
   std::map<RobotArm, rclcpp::Client<ExecutePose>::SharedPtr> exec_pose_cli_;
   std::map<RobotArm, rclcpp::Client<ExecuteWaypoints>::SharedPtr> exec_wps_cli_;
 
   // ============== Services Servers ==============
 
+  rclcpp::Service<Trigger>::SharedPtr testing_srv_;
   std::vector<rclcpp::Service<Trigger>::SharedPtr> move_to_srv_;
 
   constexpr static std::chrono::duration CLI_REQ_TIMEOUT = std::chrono::seconds(30);

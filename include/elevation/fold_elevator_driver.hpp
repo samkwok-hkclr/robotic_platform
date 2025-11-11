@@ -129,8 +129,7 @@ private:
   constexpr static std::chrono::duration CLI_REQ_TIMEOUT = std::chrono::seconds(30);
 
   const std::vector<std::string> keys = {"joint1", "joint2", "joint3", "joint4"};
-  const std::string ELEV_FLAT_JOINT = "joint4";
-  const std::string ELEV_FLAT_LINK = "link4";
+
 
   // It is because tf2 does not provide high accuracy of floating value
   constexpr static double ABS_Y_DISTANCE = -0.00665;

@@ -150,6 +150,11 @@ template bool NodeBase::send_sync_req<robot_controller_msgs::srv::GetPose>(
 
   // ===================== send_sync_req robotic_platform_msgs =====================
 
+template bool NodeBase::send_sync_req<robotic_platform_msgs::srv::ControlGripper>(
+  rclcpp::Client<robotic_platform_msgs::srv::ControlGripper>::SharedPtr,
+  const robotic_platform_msgs::srv::ControlGripper::Request::SharedPtr,
+  robotic_platform_msgs::srv::ControlGripper::Response::SharedPtr&,
+  const std::string) const;
 template bool NodeBase::send_sync_req<robotic_platform_msgs::srv::GetSlotStateTrigger>(
   rclcpp::Client<robotic_platform_msgs::srv::GetSlotStateTrigger>::SharedPtr,
   const robotic_platform_msgs::srv::GetSlotStateTrigger::Request::SharedPtr,

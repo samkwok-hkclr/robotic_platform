@@ -250,6 +250,7 @@ std::optional<geometry_msgs::msg::TransformStamped> PlannerBase::get_tf(
   }
 
   RCLCPP_WARN(get_logger(), "get_tf OK! to_frame: %s, from_frame: %s", to_frame.c_str(), from_frame.c_str());
+
   return std::make_optional(std::move(tf_stamped));
 }
 

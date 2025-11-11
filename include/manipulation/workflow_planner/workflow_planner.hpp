@@ -22,6 +22,10 @@
 #include "std_msgs/msg/float32.hpp"
 #include "geometry_msgs/msg/pose.hpp"
 
+#include "lifecycle_msgs/srv/change_state.hpp"
+#include "lifecycle_msgs/msg/state.hpp"
+#include "lifecycle_msgs/msg/transition.hpp"
+
 #include "robotic_platform_msgs/action/pick.hpp"
 #include "robotic_platform_msgs/action/place.hpp"
 #include "robotic_platform_msgs/action/scan_sku.hpp"
@@ -56,6 +60,9 @@ class WorkflowPlanner : public PlannerBase
   using Float32 = std_msgs::msg::Float32;
   using Pose = geometry_msgs::msg::Pose;
   using TransformStamped = geometry_msgs::msg::TransformStamped;
+
+  using Transition = lifecycle_msgs::msg::Transition;
+  using ChangeState = lifecycle_msgs::srv::ChangeState;
 
   using PickPlanResult = robotic_platform_msgs::msg::PickPlanResult;
   using PlacePlanResult = robotic_platform_msgs::msg::PlacePlanResult;
@@ -102,6 +109,8 @@ public:
 
   std::string get_flat_link(uint8_t rack_id, uint8_t shelf_level) const;
   std::string get_place_link(uint8_t table_id, uint8_t index) const;
+
+  bool set_camera_lifecycle(RobotArm arm, bool activate);
 
   bool optimal_pick_elvation(const RackInfo& rack);
   bool optimal_place_elvation(const TableInfo& table);
@@ -155,6 +164,7 @@ private:
   rclcpp::CallbackGroup::SharedPtr action_ser_cbg_;
   rclcpp::CallbackGroup::SharedPtr vision_srv_cli_cbg_;
   rclcpp::CallbackGroup::SharedPtr plan_srv_cli_cbg_;
+  rclcpp::CallbackGroup::SharedPtr cam_srv_cli_cbg_;
   rclcpp::CallbackGroup::SharedPtr exec_timer_cbg_;
   rclcpp::CallbackGroup::SharedPtr tf_timer_cbg_;
 
@@ -174,6 +184,8 @@ private:
   rclcpp::Client<PickPlan>::SharedPtr pick_plan_cli_;
   rclcpp::Client<PlacePlan>::SharedPtr place_plan_cli_;
 
+  std::map<RobotArm, rclcpp::Client<ChangeState>::SharedPtr> camera_cli_;
+
   // ============== Action Sersers ==============
 
   rclcpp_action::Server<Pick>::SharedPtr pick_action_ser_;
@@ -181,7 +193,7 @@ private:
   rclcpp_action::Server<ScanSku>::SharedPtr scan_sku_action_ser_;
   rclcpp_action::Server<Replenish>::SharedPtr replenish_action_ser_;
 
-    rclcpp_action::GoalResponse pick_goal_cb(
+  rclcpp_action::GoalResponse pick_goal_cb(
     const rclcpp_action::GoalUUID & uuid, 
     std::shared_ptr<const Pick::Goal> goal);
   rclcpp_action::CancelResponse pick_cancel_cb(

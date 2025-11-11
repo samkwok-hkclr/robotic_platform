@@ -49,7 +49,18 @@ std::optional<std::vector<robotic_platform_msgs::msg::ObjectPose>> WorkflowPlann
     RCLCPP_ERROR(get_logger(), "Failed to move to SKU [%d] position", sku_id);
     return std::nullopt;
   }
-  RCLCPP_ERROR(get_logger(), "%s arm move to SKU [%d] scan position", arm == RobotArm::LEFT ? "Left" : "Right", sku_id);
+  
+  std::string tcp;
+  if (arm == RobotArm::LEFT || arm == RobotArm::LEFT_ACTION)
+  {
+    tcp = "left_tcp";
+    RCLCPP_ERROR(get_logger(), "Left arm move to SKU [%d] scan position", sku_id);
+  }
+  else if (arm == RobotArm::RIGHT || arm == RobotArm::RIGHT_ACTION)
+  {
+    tcp = "right_tcp";
+    RCLCPP_ERROR(get_logger(), "Right arm move to SKU [%d] scan position", sku_id);
+  }
 
   // 1st attempt
   if (auto result = scan_and_check(1); result.has_value()) 
@@ -58,7 +69,7 @@ std::optional<std::vector<robotic_platform_msgs::msg::ObjectPose>> WorkflowPlann
   }
 
   // Get current pose for offset calculations
-  auto tf_stamped = get_tf(ARM_REF_FRAME, arm == RobotArm::LEFT ? "left_tcp" : "right_tcp");
+  auto tf_stamped = get_tf(ARM_REF_FRAME, tcp);
   if (!tf_stamped.has_value())
   {
     return std::nullopt;

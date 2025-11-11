@@ -33,7 +33,9 @@
 enum RobotArm : uint8_t
 {
   LEFT = 1,
+  LEFT_ACTION,
   RIGHT,
+  RIGHT_ACTION,
   WHOLE,
 
   LAST // should not be assigned
@@ -88,25 +90,40 @@ public:
 
   inline static const std::map<RobotArm, std::string> arm_to_str = {
     { RobotArm::LEFT, "left_arm" },
+    { RobotArm::LEFT_ACTION, "left_action_arm" },
     { RobotArm::RIGHT, "right_arm" },
+    { RobotArm::RIGHT_ACTION, "right_action_arm" },
     { RobotArm::WHOLE, "whole_arm" }
   };
 
   inline static const std::map<std::string, RobotArm> str_to_arm = {
     { "left", RobotArm::LEFT } ,
     { "left_arm", RobotArm::LEFT } ,
+    { "left_action_arm", RobotArm::LEFT_ACTION } ,
 
     { "right", RobotArm::RIGHT },
     { "right_arm", RobotArm::RIGHT },
+    { "right_action_arm", RobotArm::RIGHT_ACTION },
 
     { "whole", RobotArm::WHOLE },
     { "whole_arm", RobotArm::WHOLE }
   };
 
+  const std::array<RobotArm, 5> all_arms = {
+    RobotArm::LEFT, 
+    RobotArm::LEFT_ACTION, 
+    RobotArm::RIGHT, 
+    RobotArm::RIGHT_ACTION, 
+    RobotArm::WHOLE
+  };
+
   const std::string BASE_LINK = "base_link";
   const std::string BASE_FOOTPRINT = "base_footprint";
   const std::string OBJECT_POSE = "object_pose";
-  const std::string ARM_REF_FRAME = "link4";
+  const std::string ARM_REF_FRAME = "base_footprint";
+  const std::string ELEV_FLAT_JOINT = "joint4";
+  const std::string ELEV_FLAT_LINK = "link4";
+  const std::string MAP_FRAME = "map";
 
 private:  
   std::unique_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_;

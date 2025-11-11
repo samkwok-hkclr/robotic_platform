@@ -7,7 +7,7 @@ VacuumGripper::VacuumGripper(
   declare_parameter<double>("leak_threshold", 0.0);
   get_parameter("leak_threshold", leak_threshold_);
 
-  if (std::abs(leak_threshold_) <= 0.001)
+  if (std::abs(leak_threshold_) <= 0.01)
   {
     RCLCPP_INFO(get_logger(), "Leak threshold does not set.");
     rclcpp::shutdown();
@@ -52,18 +52,20 @@ VacuumGripper::VacuumGripper(
 
 void VacuumGripper::leak_validation_cb(void)
 {
-  std::lock_guard<std::mutex> lock(mutex_);
-
-  if (!status_.get_state())
+  if (!state_.load())
     return;
 
-  const float curr_pressure = status_.get_pressure();
+  const float curr_pressure = pressure_.load();
 
   if (curr_pressure > (leak_threshold_ / 1000.0)) 
   {
+    RCLCPP_WARN(get_logger(), "Vacuum leak detected! Pressure: %.4f Pa [leak threshold: %.4f Pa]", curr_pressure, leak_threshold_ / 1000.0);
+
+    if (!leak_pub_ || leak_pub_->get_subscription_count() == 0)
+      return;
+
     Empty msg;
     leak_pub_->publish(msg);
-    RCLCPP_WARN(get_logger(), "Vacuum leak detected! Pressure: %.4f Pa [leak threshold: %.4f Pa]", curr_pressure, leak_threshold_);
   }
 }
 
@@ -87,32 +89,24 @@ bool VacuumGripper::gripper_action(const bool cmd)
 
 void VacuumGripper::state_cb(const Bool::SharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(mutex_);
-
-  status_.set_state(msg->data);
+  state_.store(msg->data);
   RCLCPP_DEBUG(get_logger(), "Gripper state: %s", msg->data ? "ON" : "OFF");
 }
 
 void VacuumGripper::range_cb(const Range::SharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(mutex_);
-
-  status_.set_distance(msg->range);
+  distance_.store(msg->range);
   RCLCPP_DEBUG(get_logger(), "Gripper ultra distance: %.4f", msg->range);
 }
 
 void VacuumGripper::temp_cb(const Temperature::SharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(mutex_);
-
-  status_.set_temperature(msg->temperature);
+  temperature_.store(msg->temperature);
   RCLCPP_DEBUG(get_logger(), "Gripper ultra distance: %.1f", msg->temperature);
 }
 
 void VacuumGripper::pressure_cb(const FluidPressure::SharedPtr msg)
 {
-  std::lock_guard<std::mutex> lock(mutex_);
-
-  status_.set_pressure(msg->fluid_pressure);
+  pressure_.store(msg->fluid_pressure);
   RCLCPP_DEBUG(get_logger(), "Vacuum gripper pressure: %.f", msg->fluid_pressure);
 }

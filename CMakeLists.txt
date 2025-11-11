@@ -19,6 +19,7 @@ find_package(ament_cmake REQUIRED)
 
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
+find_package(lifecycle_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(tf2 REQUIRED)
@@ -55,12 +56,15 @@ set(manager_files
 
 set(manipulation_files
   src/manipulation/end_effector_ctrl/vacuum_gripper.cpp
+  src/manipulation/end_effector_ctrl/finger_gripper.cpp
 
   src/manipulation/collision_planner/collision_planner.cpp
 
   src/manipulation/motion_planner/motion_planner.cpp
-  src/manipulation/motion_planner/motion_impl.cpp
+  src/manipulation/motion_planner/finger_gripper_impl.cpp
+  src/manipulation/motion_planner/vac_gripper_impl.cpp
   src/manipulation/motion_planner/motion.cpp
+  src/manipulation/motion_planner/motion_impl.cpp
   src/manipulation/motion_planner/utils.cpp
 
   src/manipulation/workflow_planner/workflow_planner.cpp
@@ -106,6 +110,8 @@ ament_target_dependencies(platform_server
   
   std_msgs
   std_srvs
+
+  lifecycle_msgs
   
   sensor_msgs
 

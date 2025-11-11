@@ -1,5 +1,5 @@
-#ifndef vacuum_gripper_HPP__
-#define vacuum_gripper_HPP__
+#ifndef VACUUM_GRIPPER_HPP__
+#define VACUUM_GRIPPER_HPP__
 
 #pragma once
 
@@ -20,21 +20,20 @@
 #include "sensor_msgs/msg/range.hpp"
 
 #include "node_base.hpp"
-#include "vacuum_gripper_status.hpp"
 
 using std::placeholders::_1;
 using std::placeholders::_2;
 
 class VacuumGripper : public NodeBase
 {
-  using SetBool = std_srvs::srv::SetBool;
-
   using Empty = std_msgs::msg::Empty;
   using Bool = std_msgs::msg::Bool;
 
   using FluidPressure = sensor_msgs::msg::FluidPressure;
   using Temperature = sensor_msgs::msg::Temperature;
   using Range = sensor_msgs::msg::Range;
+
+  using SetBool = std_srvs::srv::SetBool;
 
 public:
   VacuumGripper(const rclcpp::NodeOptions& options);
@@ -50,11 +49,12 @@ public:
   void leak_validation_cb(void);
 
 private:
-  std::mutex mutex_;
+  std::atomic<bool> state_{false};
+  std::atomic<float> pressure_{0.0f};
+  std::atomic<float> distance_{0.0f};
+  std::atomic<float> temperature_{0.0f};
 
   float leak_threshold_;
-
-  VacuumGripperStatus status_;
 
   rclcpp::CallbackGroup::SharedPtr srv_cli_cbg_;
 
@@ -71,4 +71,4 @@ private:
 
 };
 
-#endif // vacuum_gripper_HPP__
+#endif // VACUUM_GRIPPER_HPP__
