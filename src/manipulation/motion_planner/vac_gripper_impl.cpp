@@ -40,14 +40,15 @@ bool MotionPlanner::try_to_pick_by_vac(
 
     RCLCPP_DEBUG(get_logger(), "Checking for leaks...");
     const auto start = std::chrono::steady_clock::now();
+    
+    std::this_thread::sleep_for(leak_check_duration);
+
     start_leak_valid.store(true);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
-    while (leak_detected.load() && (std::chrono::steady_clock::now() - start) < leak_check_duration) 
-    {
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
+    // while (leak_detected.load() && (std::chrono::steady_clock::now() - start) < leak_check_duration) 
+    // {
+    //   std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    // }
 
     if (leak_detected.load()) 
     {

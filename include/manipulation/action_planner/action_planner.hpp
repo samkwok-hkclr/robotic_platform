@@ -57,8 +57,6 @@ private:
   
   std::vector<std::tuple<Pose, std::string, std::string>> tf_buf_;
 
-  rclcpp::CallbackGroup::SharedPtr srv_ser_cbg_;
-
   rclcpp::TimerBase::SharedPtr tf_pub_timer;
 
   // ============== Services ==============
@@ -66,11 +64,11 @@ private:
   rclcpp::Service<PlacePlan>::SharedPtr place_plan_srv_;
 
   std::vector<double> eef_offset_;
-  double pre_obj_pose_shift_; 
-  double pre_place_pose_shift_;
-  double post_pick_lift_offset_;
-  double post_pick_back_offset_;
-  double post_place_down_offset_;
+  // double pre_obj_pose_shift_; 
+  // double pre_place_pose_shift_;
+  // double post_pick_lift_offset_;
+  // double post_pick_back_offset_;
+  // double post_place_down_offset_;
 };
 
 #endif // ACTION_PLANNER_HPP__

@@ -82,7 +82,7 @@ std::optional<std::map<uint8_t, double>> Manager::send_pick_goal(
   {
     case rclcpp_action::ResultCode::SUCCEEDED:
       result_code = true;
-      RCLCPP_DEBUG(this->get_logger(), "A nice Goal. Happy day.");
+      RCLCPP_DEBUG(this->get_logger(), "Happy");
       break;
     case rclcpp_action::ResultCode::ABORTED:
       RCLCPP_ERROR(this->get_logger(), "Goal was aborted");
@@ -109,16 +109,16 @@ std::optional<std::map<uint8_t, double>> Manager::send_pick_goal(
 
     if (all_arm_success)
     {
-      std::map<uint8_t, double> height;
+      std::map<uint8_t, double> height_map;
 
       RCLCPP_INFO(get_logger(), "height map should contains %zu elements:", pick_results.size());
       for (const auto& pick_result : pick_results)
       {
-        height[pick_result.arm_id] = pick_result.height;
+        height_map[pick_result.arm_id] = pick_result.height;
         RCLCPP_INFO(get_logger(), "  arm_id: %u, height: %.3f", pick_result.arm_id, pick_result.height);
       }
 
-      return std::make_optional(std::move(height));
+      return std::make_optional(std::move(height_map));
     }
   }
 

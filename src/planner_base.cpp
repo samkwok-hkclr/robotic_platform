@@ -254,3 +254,43 @@ std::optional<geometry_msgs::msg::TransformStamped> PlannerBase::get_tf(
   return std::make_optional(std::move(tf_stamped));
 }
 
+std::vector<tf2::Transform> PlannerBase::interpolate_tf(
+  const tf2::Transform& start, 
+  const tf2::Transform& end, 
+  double max_step_distance)
+{
+  std::vector<tf2::Transform> intermediate_poses;
+
+  tf2::Vector3 start_pos = start.getOrigin();
+  tf2::Vector3 end_pos = end.getOrigin();
+  double distance = start_pos.distance(end_pos);
+  
+  if (distance <= max_step_distance) 
+  {
+    intermediate_poses.push_back(end);
+    return intermediate_poses;
+  }
+
+  int steps = std::ceil(distance / max_step_distance);
+
+  for (int i = 1; i <= steps; ++i) 
+  {
+    double t = static_cast<double>(i) / steps;
+    
+    tf2::Vector3 interp_pos = start_pos.lerp(end_pos, t);
+    
+    // SLERP for rotation (spherical linear interpolation)
+    tf2::Quaternion start_rot = start.getRotation();
+    tf2::Quaternion end_rot = end.getRotation();
+    tf2::Quaternion interp_rot = start_rot.slerp(end_rot, t);
+    
+    tf2::Transform interp_pose;
+    interp_pose.setOrigin(interp_pos);
+    interp_pose.setRotation(interp_rot);
+    
+    intermediate_poses.push_back(interp_pose);
+  }
+  
+  return intermediate_poses;
+}
+

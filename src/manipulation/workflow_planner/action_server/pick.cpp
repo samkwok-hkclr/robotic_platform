@@ -126,11 +126,8 @@ void WorkflowPlanner::pick_execution(const std::shared_ptr<GoalHandlerPick> goal
 
     result->results.emplace_back(msg);
 
-    if (height.has_value())
-    {
-      motion_planner_->move_to_holding_pose(arm, 100.0);
-    }
-
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    
     if (!set_camera_lifecycle(arm, false))
     {
       RCLCPP_ERROR(get_logger(), "Failed to deactivate camera");
@@ -138,6 +135,11 @@ void WorkflowPlanner::pick_execution(const std::shared_ptr<GoalHandlerPick> goal
       msg.message = "Failed to deactivate camera";
       result->results.emplace_back(msg);
       continue;
+    }
+
+    if (height.has_value())
+    {
+      motion_planner_->move_to_holding_pose(arm, 100.0);
     }
 
     clear_tf_buf();

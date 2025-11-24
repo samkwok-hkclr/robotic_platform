@@ -3,7 +3,7 @@
 bool Manager::send_place_goal(
   const std::vector<OrderItem>& order_items,
   const std::vector<size_t>& items_selected,
-  const uint8_t table_id,
+  const uint8_t port_id,
   const std::map<uint8_t, double>& place_height,
   std::vector<bool>& place_occupancy_map)
 {
@@ -30,7 +30,7 @@ bool Manager::send_place_goal(
     task.arm_id = order_items[i].sku.is_suctionable ? RobotArm::LEFT_ACTION : RobotArm::RIGHT_ACTION;
     task.sku_id = order_items[i].sku.id;
     task.height = place_height.at(order_items[i].sku.is_suctionable ? RobotArm::LEFT_ACTION : RobotArm::RIGHT_ACTION); 
-    task.table.id = table_id;
+    task.table.id = port_id;
 
     const auto& place_order = order_items[i].sku.is_suctionable ? LEFT_ARM_PLACE_ORDER : RIGHT_ARM_PLACE_ORDER;
     task.table.index = 0;

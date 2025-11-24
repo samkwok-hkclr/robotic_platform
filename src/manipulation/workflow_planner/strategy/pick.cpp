@@ -5,6 +5,7 @@ std::optional<double> WorkflowPlanner::try_to_pick_up(
   const RackInfo& rack)
 {
   RCLCPP_WARN(get_logger(), "try to pick up item %d", sku_id);
+  const uint8_t max_pick_attempt = get_parameter("max_pick_attempt").as_int();
   uint8_t attempt = 1;
   bool success = false;
 
@@ -12,7 +13,7 @@ std::optional<double> WorkflowPlanner::try_to_pick_up(
 
   const std::string flat_frame = get_flat_link(rack.id, rack.shelf_level);
 
-  for (; attempt <= max_pick_attempt_; attempt++)
+  for (; attempt <= max_pick_attempt; attempt++)
   {
     RCLCPP_INFO(get_logger(), "Attempt [%d]: try to pick up item %d", attempt, sku_id);
 

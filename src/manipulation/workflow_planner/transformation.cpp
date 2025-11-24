@@ -24,6 +24,11 @@ std::optional<geometry_msgs::msg::Pose> WorkflowPlanner::extract_object_pose(
     tcp = "left_tcp";
   else if (arm == RobotArm::RIGHT || arm == RobotArm::RIGHT_ACTION)
     tcp = "right_tcp";
+  else
+  {
+    RCLCPP_ERROR(get_logger(), "tcp error");
+    return std::nullopt;
+  }
   
   std::optional<TransformStamped> tf_stamped = get_tf(ARM_REF_FRAME, tcp);
 

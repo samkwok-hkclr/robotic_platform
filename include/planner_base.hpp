@@ -88,6 +88,11 @@ public:
     const std::string& to_frame, 
     const std::string& from_frame);
 
+  std::vector<tf2::Transform> interpolate_tf(
+    const tf2::Transform& start, 
+    const tf2::Transform& end, 
+    double max_step_distance = 0.1);
+
   inline static const std::map<RobotArm, std::string> arm_to_str = {
     { RobotArm::LEFT, "left_arm" },
     { RobotArm::LEFT_ACTION, "left_action_arm" },

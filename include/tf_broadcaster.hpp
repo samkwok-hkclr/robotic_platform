@@ -36,15 +36,17 @@ public:
     const rclcpp::NodeOptions& options);
   ~TfBroadcaster() = default;
 
+  void setup_tcp_tf(void);
   void setup_static_tf(void);
 
   void push_static_tf(const std::tuple<Pose, std::string, std::string>& tf);
   void push_tf_buf(const std::tuple<Pose, std::string, std::string>& tf);
-  void clear_tf_buf();
+  void clear_tf_buf(void);
 
   void tf_pub_cb(void);
 
 private:
+  bool simulation_;
   std::mutex tf_mutex_;
   
   std::vector<std::tuple<Pose, std::string, std::string>> tf_buf_;

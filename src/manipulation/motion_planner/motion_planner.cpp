@@ -109,7 +109,6 @@ MotionPlanner::MotionPlanner(
     rmw_qos_profile_services_default,
     srv_ser_cbg_);
 
-  // move_to_srv_.reserve(pose_actions.size());
   for (const auto& [arm, actions] : pose_actions) 
   {
     for (const auto& [pose_name, func] : actions) 
@@ -280,31 +279,3 @@ void MotionPlanner::testing_cb(
   
   response->success = true;
 }
-
-  // if (auto it = pose_actions.find(pose); it != pose_actions.end()) 
-  // {
-  //   if (it->second(arm, default_speed)) 
-  //   {
-  //     RCLCPP_INFO(get_logger(), "Successfully moved to pose '%s' (speed: %.1f)", pose.data(), default_speed);
-  //     response->success = true;
-  //   }
-  //   else
-  //   {
-  //     RCLCPP_ERROR(get_logger(), "Failed to move to pose '%s' (speed: %.1f)", pose.data(), default_speed);
-  //   }
-  // } 
-  // else 
-  // {
-  //   std::string available_poses;
-  //   for (const auto& pair : pose_actions) 
-  //   {
-  //     if (!available_poses.empty()) 
-  //       available_poses += ", ";
-      
-  //     available_poses += "'" + std::string(pair.first) + "'";
-  //   }
-    
-  //   RCLCPP_ERROR(get_logger(), "Unknown pose requested: '%s' - Available poses: [%s]", pose.data(), available_poses.c_str());
-  //   response->success = false;
-  //   response->message = "Unknown pose requested";
-  // }  

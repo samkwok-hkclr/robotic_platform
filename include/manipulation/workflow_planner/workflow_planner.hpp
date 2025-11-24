@@ -20,6 +20,8 @@
 #include "rclcpp_action/rclcpp_action.hpp"
 
 #include "std_msgs/msg/float32.hpp"
+#include "rcl_interfaces/msg/parameter.hpp"
+#include "rcl_interfaces/srv/set_parameters.hpp"
 #include "geometry_msgs/msg/pose.hpp"
 
 #include "lifecycle_msgs/msg/state.hpp"
@@ -58,6 +60,9 @@ using std::placeholders::_3;
 
 class WorkflowPlanner : public PlannerBase
 {
+  using Parameter = rcl_interfaces::msg::Parameter;
+  using SetParameters = rcl_interfaces::srv::SetParameters;
+
   using Float32 = std_msgs::msg::Float32;
   using Pose = geometry_msgs::msg::Pose;
   using TransformStamped = geometry_msgs::msg::TransformStamped;
@@ -111,9 +116,12 @@ public:
   void clear_tf_buf();
 
   std::string get_flat_link(uint8_t rack_id, uint8_t shelf_level) const;
-  std::string get_place_link(uint8_t table_id, uint8_t index) const;
+  std::string get_place_link(uint8_t port_id, uint8_t index) const;
 
-  std::optional<State> get_camera_lifecycle_state(RobotArm arm);
+  bool set_camera_param(
+    rclcpp::Client<SetParameters>::SharedPtr& cli, 
+    std::vector<Parameter> parameters);
+  std::optional<State> get_camera_lifecycle_state(RobotArm arm_wo_action);
   bool set_camera_lifecycle(RobotArm arm, bool activate);
 
   bool optimal_pick_elvation(const RackInfo& rack);
@@ -135,6 +143,7 @@ public:
   std::optional<PickPlanResult> get_pick_plan(const Pose& object_pose, const RackInfo& rack, const std::string& flat_frame);
   std::optional<PlacePlanResult> get_place_plan(const Pose& place_pose);
 
+  void init_cb(void);
   void tf_pub_cb(void);
   void debug_cb(const Float32::SharedPtr msg);
 
@@ -150,14 +159,9 @@ private:
   std::shared_ptr<FoldElevatorDriver> fold_elev_driver_;
   std::shared_ptr<MotionPlanner> motion_planner_;
   
-  uint8_t max_pick_attempt_;
   double valid_z_threshold_;
   uint16_t max_scan_attempt_;
-  double re_scan_x_translation_;
-  double re_scan_y_translation_;
   double place_offset_;
-  double scan_x_distance_;
-  double scan_z_distance_;
 
   double optimal_arm_flat_height_distance_;
   double optimal_arm_flat_front_distance_;
@@ -177,7 +181,8 @@ private:
 
   // ============== Timers ==============
 
-  rclcpp::TimerBase::SharedPtr tf_pub_timer;
+  rclcpp::TimerBase::SharedPtr init_timer_;
+  rclcpp::TimerBase::SharedPtr tf_pub_timer_;
 
   // ============== Subscriber ==============
 

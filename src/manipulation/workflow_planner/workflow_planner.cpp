@@ -23,24 +23,16 @@ WorkflowPlanner::WorkflowPlanner(
   declare_parameter<double>("optimal_arm_flat_front_distance", 0.5);
   declare_parameter<double>("table_front_offset", 0.5);
   declare_parameter<double>("table_height_offset", 0.0);
-  declare_parameter<std::string>("poses_file", "");
   declare_parameter<std::vector<double>>("tcp_to_left_camera", std::vector<double>{});
   declare_parameter<std::vector<double>>("tcp_to_right_camera", std::vector<double>{});
 
-  std::string poses_file;
   get_parameter("sim", simulation_);
   get_parameter("valid_z_threshold", valid_z_threshold_);
-  get_parameter("max_pick_attempt", max_pick_attempt_);
   get_parameter("max_scan_attempt", max_scan_attempt_);
-  get_parameter("re_scan_x_translation", re_scan_x_translation_);
-  get_parameter("re_scan_y_translation", re_scan_y_translation_);
   get_parameter("place_offset", place_offset_);
-  get_parameter("scan_x_distance", scan_x_distance_);
-  get_parameter("scan_z_distance", scan_z_distance_);
   get_parameter("optimal_arm_flat_height_distance", optimal_arm_flat_height_distance_);
   get_parameter("table_front_offset", table_front_offset_);
   get_parameter("table_height_offset", table_height_offset_);
-  get_parameter("poses_file", poses_file);
 
   setup_camera_transform(RobotArm::LEFT, "left");
   setup_camera_transform(RobotArm::RIGHT, "right");
@@ -54,7 +46,11 @@ WorkflowPlanner::WorkflowPlanner(
   exec_timer_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   tf_timer_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
-  tf_pub_timer = create_wall_timer(
+  init_timer_ = create_wall_timer(
+    std::chrono::milliseconds(5000), 
+    std::bind(&WorkflowPlanner::init_cb, this));
+
+  tf_pub_timer_ = create_wall_timer(
     std::chrono::milliseconds(20), 
     std::bind(&WorkflowPlanner::tf_pub_cb, this),
     tf_timer_cbg_);
@@ -64,23 +60,28 @@ WorkflowPlanner::WorkflowPlanner(
     10, 
     std::bind(&WorkflowPlanner::debug_cb, this, _1));
 
-  const std::string camera_prefix = "/left_camera/realsense/";
+  const std::string left_camera_prefix = "/left_camera/realsense";
+  const std::string right_camera_prefix = "/right_camera/realsense";
   const std::vector<std::tuple<RobotArm, std::string, std::string>> camera_srv = {
-    { RobotArm::LEFT, "get_state", "change_state" },
-    { RobotArm::RIGHT, "get_state", "change_state" }
+    { RobotArm::LEFT, "/get_state", "/change_state" },
+    { RobotArm::RIGHT, "/get_state", "/change_state" }
   };
 
   for (const auto& cam : camera_srv)
   {
+    const std::string prefix = std::get<0>(cam) == RobotArm::LEFT ? left_camera_prefix : right_camera_prefix;
+
     get_camera_cli_[std::get<0>(cam)] = create_client<GetState>(
-      camera_prefix + std::get<1>(cam), 
+      prefix + std::get<1>(cam), 
       rmw_qos_profile_services_default,
       cam_srv_cli_cbg_);
 
     change_camera_cli_[std::get<0>(cam)] = create_client<ChangeState>(
-      camera_prefix + std::get<2>(cam), 
+      prefix + std::get<2>(cam), 
       rmw_qos_profile_services_default,
       cam_srv_cli_cbg_);
+
+    RCLCPP_INFO(get_logger(), "Created a RobotArm %s camera lifecycle clients", arm_to_str.at(std::get<0>(cam)).c_str());
   }
 
   get_slot_state_tri_cli_ = create_client<GetSlotStateTrigger>(
@@ -183,4 +184,130 @@ void WorkflowPlanner::tf_pub_cb(void)
 void WorkflowPlanner::debug_cb(const Float32::SharedPtr msg)
 {
   (void) msg;
+}
+
+void WorkflowPlanner::init_cb(void)
+{
+  const std::vector<RobotArm> arms = { RobotArm::LEFT, RobotArm::RIGHT }; 
+  RCLCPP_INFO(get_logger(), "Starting camera lifecycle initialization check");
+
+  std::string srv = "/realsense/set_parameters";
+  std::map<RobotArm, rclcpp::Client<SetParameters>::SharedPtr> set_cam_param_cli;
+  
+  for (const auto& arm : arms)
+  {
+    const std::string prefix = arm == RobotArm::LEFT ? "/left_camera" : "/right_camera";
+    set_cam_param_cli[arm] = create_client<SetParameters>(
+      prefix + srv, 
+      rmw_qos_profile_services_default,
+      cam_srv_cli_cbg_);
+
+    RCLCPP_INFO(get_logger(), "Created a RobotArm %s camera set param client", arm_to_str.at(arm).c_str());
+  }
+
+  auto set_cam_param = [this, &set_cam_param_cli](RobotArm arm, bool enable_depth) -> bool {
+    const std::string arm_name = (arm == RobotArm::LEFT) ? "LEFT" : "RIGHT";
+    
+    Parameter param;
+    param.name = "enable_depth";
+    param.value.type = 1;
+    param.value.bool_value = enable_depth;
+
+    std::vector<Parameter> params;
+    params.emplace_back(std::move(param));
+
+    bool success = set_camera_param(set_cam_param_cli[arm], std::move(params));
+    
+    if (success) 
+    {
+      RCLCPP_INFO(get_logger(), "Successfully set enable_depth to %s for %s arm", 
+        enable_depth ? "true" : "false", arm_name.c_str());
+    } 
+    else 
+    {
+      RCLCPP_ERROR(get_logger(), "Failed to set enable_depth to %s for %s arm", 
+        enable_depth ? "true" : "false", arm_name.c_str());
+    }
+    
+    return success;
+  };
+
+  for (const auto& arm : arms)
+  {
+    const std::string arm_name = (arm == RobotArm::LEFT) ? "LEFT" : "RIGHT";
+    RCLCPP_DEBUG(get_logger(), "Checking %s arm camera lifecycle", arm_name.c_str());
+
+    std::optional<State> opt = get_camera_lifecycle_state(arm);
+    
+    if (!opt.has_value())
+    {
+      RCLCPP_ERROR(get_logger(), "Failed to get camera lifecycle state for %s arm - state unavailable", arm_name.c_str());
+      return;
+    }
+
+    State current_state = opt.value();
+    RCLCPP_INFO(get_logger(), "%s arm camera lifecycle state: %d", arm_name.c_str(), current_state.id);
+
+    if (current_state.id == State::PRIMARY_STATE_ACTIVE)
+    {
+      continue;
+    }
+
+    if (current_state.id == State::PRIMARY_STATE_INACTIVE)
+    {
+      RCLCPP_INFO(get_logger(), "Camera for %s arm is in INACTIVE state (current state: %d)", arm_name.c_str(), current_state.id);
+      
+      if (!set_camera_lifecycle(arm, true))
+      {
+        RCLCPP_ERROR(get_logger(), "Failed to activate camera for %s arm", arm_name.c_str());
+        return;
+      }
+      RCLCPP_INFO(get_logger(), "Successfully activated camera for %s arm", arm_name.c_str());
+    }
+  }
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+  for (const auto& arm : arms) 
+  {
+    set_cam_param(arm, false);
+  }
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+  for (const auto& arm : arms) 
+  {
+    set_cam_param(arm, true);
+  }
+
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+  for (const auto& arm : arms)
+  {
+    const std::string arm_name = (arm == RobotArm::LEFT) ? "LEFT" : "RIGHT";
+    RCLCPP_INFO(get_logger(), "Deactivating camera for %s arm", arm_name.c_str());
+    std::optional<State> opt = get_camera_lifecycle_state(arm);
+    
+    if (!opt.has_value())
+    {
+      RCLCPP_ERROR(get_logger(), "Failed to get camera lifecycle state for %s arm - state unavailable", arm_name.c_str());
+      return;
+    }
+
+    State current_state = opt.value();
+    RCLCPP_INFO(get_logger(), "%s arm camera lifecycle state: %d", arm_name.c_str(), current_state.id);
+
+    if (current_state.id == State::PRIMARY_STATE_ACTIVE)
+    {
+      if (!set_camera_lifecycle(arm, false))
+      {
+        RCLCPP_ERROR(get_logger(), "Failed to deactivate camera for %s arm", arm_name.c_str());
+        return;
+      }
+      RCLCPP_INFO(get_logger(), "Successfully deactivated camera for %s arm", arm_name.c_str());
+    }
+  }
+
+  RCLCPP_INFO(get_logger(), "Camera lifecycle initialization completed successfully - all camera nodes are operational");
+  init_timer_->cancel();
 }

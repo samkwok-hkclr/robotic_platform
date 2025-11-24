@@ -83,7 +83,16 @@ bool MotionPlanner::move_to_holding_pose(RobotArm arm, const float speed)
     return false;
   };
   
-  auto tf_stamped = get_tf(MAP_FRAME, BASE_FOOTPRINT);
+  auto tf_stamped = get_tf(BASE_FOOTPRINT, arm_wo_rotation == RobotArm::LEFT ? "left_tcp" : "right_tcp");
+  if (!tf_stamped.has_value())
+  { 
+    return move_to_holding_joint(arm_wo_rotation, speed);
+  }
+
+  tf2::Transform g_b__ef;
+  tf2::fromMsg(tf_stamped.value().transform, g_b__ef);
+  
+  tf_stamped = get_tf(MAP_FRAME, BASE_FOOTPRINT);
   if (!tf_stamped.has_value())
   { 
     return move_to_holding_joint(arm_wo_rotation, speed);
@@ -101,8 +110,8 @@ bool MotionPlanner::move_to_holding_pose(RobotArm arm, const float speed)
   tf2::Transform g_m__ef;
   tf2::fromMsg(tf_stamped.value().transform, g_m__ef);
 
-  const double x = 0.15;
-  const double y = 0.15;
+  const double x = 0.12;
+  const double y = 0.18;
   const double z = -0.05;
   const double roll = 0.0;
   const double pitch = -M_PI / 2.0;
@@ -116,8 +125,15 @@ bool MotionPlanner::move_to_holding_pose(RobotArm arm, const float speed)
     g_ef__h = get_g(x, -y, z, roll, pitch, yaw);
 
   tf2::Transform g_b__h = g_m__b.inverse() * g_m__ef * g_ef__h;
-  Pose pose = cvt_g_to_pose(g_b__h);
-  bool success = move_to(arm_wo_rotation, pose, speed);
+
+  std::vector<tf2::Transform> intermediate_tfs = interpolate_tf(g_b__ef, g_b__h, 0.1);
+
+  std::vector<Pose> poses;
+  for (const auto& tf : intermediate_tfs)
+  {
+    poses.emplace_back(cvt_g_to_pose(tf));
+  }
+  bool success = move_to(arm_wo_rotation, poses, speed);
 
   if (success) 
   {
@@ -125,7 +141,10 @@ bool MotionPlanner::move_to_holding_pose(RobotArm arm, const float speed)
     return true;
   }
   else
+  {
+    RCLCPP_INFO(get_logger(), "Move to holding pose by joint angle!");
     return move_to_holding_joint(arm_wo_rotation, speed);
+  } 
 }
 
 bool MotionPlanner::move_to_action_pose(RobotArm arm, const float speed)

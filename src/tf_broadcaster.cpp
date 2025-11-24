@@ -5,9 +5,20 @@ TfBroadcaster::TfBroadcaster(
   const rclcpp::NodeOptions& options)
 : PlannerBase(node_name, options)
 {
-  // FIXME: the frames should be provided by AGV
-	push_tf_buf(std::make_tuple(cvt_g_to_pose(get_g(0.9, 1.35, 0, 0, 0, M_PI/2)), "map", BASE_FOOTPRINT));
+  declare_parameter<bool>("sim", false);
+  declare_parameter<std::vector<double>>("rack_1_shelf_1", std::vector<double>{});
+  declare_parameter<std::vector<double>>("rack_1_shelf_2", std::vector<double>{});
+  declare_parameter<std::vector<double>>("rack_1_shelf_3", std::vector<double>{});
+  declare_parameter<std::vector<double>>("rack_1_shelf_4", std::vector<double>{});
+  declare_parameter<std::vector<double>>("left_tcp_to_camera", std::vector<double>{});
+  declare_parameter<std::vector<double>>("right_tcp_to_camera", std::vector<double>{});
 
+  get_parameter("sim", simulation_);
+
+  // FIXME: the frames should be provided by AGV
+	push_tf_buf(std::make_tuple(cvt_g_to_pose(get_g(0.8, 1.35, 0, 0, 0, M_PI/2)), "map", BASE_FOOTPRINT));
+
+  setup_tcp_tf();
   setup_static_tf();
 
 	tf_timer_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
@@ -20,7 +31,30 @@ TfBroadcaster::TfBroadcaster(
 	RCLCPP_INFO(get_logger(), "TF Broadcaster is up.");
 }
 
-void TfBroadcaster::setup_static_tf()
+void TfBroadcaster::setup_tcp_tf(void)
+{
+  if (simulation_)
+  {
+
+  }
+  else
+  {
+    std::vector<double> right = get_parameter("right_tcp_to_camera").as_double_array();
+
+    if (right.size() != 7)
+    {
+      RCLCPP_ERROR(get_logger(), "right tcp size does not match!");
+      rclcpp::shutdown();
+    }
+
+    tf2::Transform g_cam_tcp = get_g(right[0], right[1], right[2], right[3], right[4], right[5], right[6]);
+    Pose p = cvt_g_to_pose(g_cam_tcp.inverse());
+    push_static_tf(std::make_tuple(p, "right_camera_color_optical_frame", "right_tcp"));
+  } 
+
+}
+
+void TfBroadcaster::setup_static_tf(void)
 {
   struct ShelfDefinition 
   {
@@ -30,11 +64,10 @@ void TfBroadcaster::setup_static_tf()
   };
 
   std::vector<ShelfDefinition> all_shelves = {
-    {"rack_1", "shelf_1", { }},
-    {"rack_1", "shelf_2", { 0.22, 0.37, 0.90 }},
-    {"rack_1", "shelf_3", { 0.22, 0.37, 0.61, 0.79, 0.92, 1.05 }},
-    {"rack_1", "shelf_4", { 0.24, 0.37, 0.61, 0.79, 0.92, 1.05 }},
-    // {"rack_2", "shelf_2", {0.1, 0.15, 0.25, 0.4}}, // Irregular spacing
+    {"rack_1", "shelf_1", get_parameter("rack_1_shelf_1").as_double_array()},
+    {"rack_1", "shelf_2", get_parameter("rack_1_shelf_2").as_double_array()},
+    {"rack_1", "shelf_3", get_parameter("rack_1_shelf_3").as_double_array()},
+    {"rack_1", "shelf_4", get_parameter("rack_1_shelf_4").as_double_array()},
   };
 
   for (const auto& shelf_def : all_shelves) 

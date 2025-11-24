@@ -8,7 +8,7 @@ std::optional<std::vector<robotic_platform_msgs::msg::ObjectPose>> WorkflowPlann
 {
   auto scan_and_check = [&](uint32_t attempt_num) -> std::optional<std::vector<ObjectPose>> {
     // wait for image streaming become stable
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(250));
 
     std::optional<std::vector<ObjectPose>> obj_poses = get_obj_poses(sku_id, camera_id);
     
@@ -43,8 +43,14 @@ std::optional<std::vector<robotic_platform_msgs::msg::ObjectPose>> WorkflowPlann
                               float y_scale, 
                               uint32_t start_attempt,
                               const tf2::Transform& g_b__tcp) -> std::optional<std::vector<ObjectPose>> {
-    const float translation_step = (axis == "X") ? re_scan_x_translation_ : re_scan_y_translation_;
     
+    float translation_step;
+
+    if (axis == "X") 
+      translation_step = get_parameter("re_scan_x_translation").as_double();
+    else
+      translation_step = get_parameter("re_scan_y_translation").as_double();
+
     for (uint16_t i = 0; i < max_scan_attempt_; i++) 
     {
       // Negative first: -d, +d, -2d, +2d, -3d, +3d...
@@ -124,59 +130,11 @@ std::optional<std::vector<robotic_platform_msgs::msg::ObjectPose>> WorkflowPlann
   }
 
   // X-axis translation attempts
-  if (auto result = try_translation("X", 1.0f, 0.0f, max_scan_attempt_ + 2, g_b__tcp); result.has_value())
-  {
-    return result;
-  }
+  // if (auto result = try_translation("X", 1.0f, 0.0f, max_scan_attempt_ + 2, g_b__tcp); result.has_value())
+  // {
+  //   return result;
+  // }
 
   RCLCPP_ERROR(get_logger(), "Failed to scan <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<");
   return std::nullopt;
 }
-
-
-
-  // for (uint16_t i = 0; i < max_scan_attempt_; i++) 
-  // {
-  //   float offset = ((i % 2) * 2 - 1) * ((i / 2) + 1) * re_scan_y_translation_;
-  //   RCLCPP_WARN(get_logger(), "X-axis translate offset: %.4f", offset);
-
-  //   tf2::Transform g_tcp__tcp_offset = get_g(0, offset, 0, 0, 0, 0);
-  //   tf2::Transform g_b__tcp_offset = g_b__tcp * g_tcp__tcp_offset;
-    
-  //   Pose p = cvt_g_to_pose(g_b__tcp_offset);
-    
-  //   if (!motion_planner_->move_to(arm, p, 100.0f)) 
-  //   {
-  //     RCLCPP_ERROR(get_logger(), "Failed to move to offset position");
-  //     continue; // Try next offset instead of giving up
-  //   }
-    
-  //   // +2 because attempt 1 already done
-  //   if (auto result = scan_and_check(i + 2); result.has_value()) 
-  //   { 
-  //     return result;
-  //   }
-  // }
-
-  // for (uint16_t i = 0; i < max_scan_attempt_; i++) 
-  // {
-  //   float offset = ((i % 2) * 2 - 1) * ((i / 2) + 1) * re_scan_x_translation_;
-  //   RCLCPP_WARN(get_logger(), "X-axis translate offset: %.4f", offset);
-
-  //   tf2::Transform g_tcp__tcp_offset = get_g(offset, 0, 0, 0, 0, 0);
-  //   tf2::Transform g_b__tcp_offset = g_b__tcp * g_tcp__tcp_offset;
-    
-  //   Pose p = cvt_g_to_pose(g_b__tcp_offset);
-    
-  //   if (!motion_planner_->move_to(arm, p, 100.0f)) 
-  //   {
-  //     RCLCPP_ERROR(get_logger(), "Failed to move to X-offset position");
-  //     continue; // Try next offset instead of giving up
-  //   }
-    
-  //   // + max_scan_attempt_ + 2 because Y-axis attempts and attempt 1 already done
-  //   if (auto result = scan_and_check(i + max_scan_attempt_ + 2); result.has_value()) 
-  //   { 
-  //     return result;
-  //   }
-  // }

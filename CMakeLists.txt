@@ -20,6 +20,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(lifecycle_msgs REQUIRED)
+find_package(rcl_interfaces REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(tf2 REQUIRED)
@@ -48,7 +49,10 @@ set(common_files
 )
 
 set(manager_files
+  src/manager/main.cpp
   src/manager/manager.cpp
+  src/manager/action_server/new_order.cpp
+  src/manager/execution.cpp
   src/manager/utils.cpp
   src/manager/pick.cpp
   src/manager/place.cpp
@@ -81,19 +85,59 @@ set(manipulation_files
   src/manipulation/workflow_planner/action_server/scan_sku.cpp
   src/manipulation/workflow_planner/action_server/replenish.cpp
 
-  src/manipulation/action_planner/action_planner.cpp
-  src/manipulation/action_planner/service_server/plan.cpp
-  
   src/elevation/fold_elevator_driver.cpp
   src/elevation/impl.cpp
   src/elevation/utils.cpp
 )
 
-add_executable(platform_server 
-  src/main.cpp
-
+add_executable(manager 
   ${common_files}
   ${manager_files}
+)
+target_include_directories(manager PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(manager
+  rclcpp
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  std_msgs
+  std_srvs
+  geometry_msgs
+  robot_controller_msgs
+  robotic_platform_msgs
+  robostore_msgs
+)
+target_compile_features(manager PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+
+add_executable(action_planner 
+  ${common_files}
+  src/manipulation/action_planner/action_planner.cpp
+  src/manipulation/action_planner/service_server/plan.cpp
+)
+target_include_directories(action_planner PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(action_planner
+  rclcpp
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  std_msgs
+  std_srvs
+  geometry_msgs
+  robotic_platform_msgs
+  robot_controller_msgs
+)
+target_compile_features(action_planner PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+
+add_executable(platform_server 
+  src/platform_server.cpp
+
+  ${common_files}
   ${manipulation_files}
 )
 target_include_directories(platform_server PUBLIC
@@ -103,24 +147,18 @@ target_include_directories(platform_server PUBLIC
 ament_target_dependencies(platform_server
   rclcpp
   rclcpp_action
-
+  rcl_interfaces
   tf2
   tf2_ros
   tf2_geometry_msgs
-  
   std_msgs
   std_srvs
-
   lifecycle_msgs
-  
   sensor_msgs
-
   geometry_msgs
   moveit_msgs
-
   geometric_shapes
   Boost
-
   robot_controller_msgs
   robotic_platform_msgs
   robostore_msgs
@@ -130,7 +168,9 @@ target_link_libraries(platform_server
 target_compile_features(platform_server PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
 install(TARGETS 
+  manager
   platform_server
+  action_planner
   DESTINATION lib/${PROJECT_NAME}
 )
 

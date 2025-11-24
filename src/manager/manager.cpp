@@ -1,9 +1,7 @@
 #include "manager/manager.hpp"
 
-Manager::Manager(
-  std::string node_name, 
-  const rclcpp::NodeOptions& options)
-: PlannerBase(node_name, options)
+Manager::Manager(const rclcpp::NodeOptions& options)
+: PlannerBase("manager", options)
 {
   declare_parameter<std::vector<std::string>>("rotation_name", std::vector<std::string>{});
   declare_parameter<std::vector<std::string>>("arm_poses_name", std::vector<std::string>{});
@@ -13,19 +11,31 @@ Manager::Manager(
 
   if (rotation_name_.empty() || arm_poses_name_.empty())
   {
-    RCLCPP_INFO(this->get_logger(), "rotation name does not set");
+    RCLCPP_INFO(get_logger(), "rotation name does not set");
     rclcpp::shutdown();
   }
 
   srv_ser_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   srv_cli_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   action_cli_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  action_ser_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+
+  robot_status_timer_ = create_wall_timer(
+    std::chrono::seconds(1), 
+    std::bind(&Manager::robot_status_cb, this));
 
   testing_timer_ = create_wall_timer(
     std::chrono::milliseconds(100), 
     std::bind(&Manager::testing_cb, this));
+  testing_timer_->cancel();
+
+  clear_occupy_timer_ = create_wall_timer(
+    std::chrono::seconds(5), 
+    std::bind(&Manager::clear_occupancy_cb, this));
+  clear_occupy_timer_->cancel();
 
   testing_pub_ = create_publisher<Int32>("testing", 10);
+  robot_status_pub_ = create_publisher<RobotStatus>("robot_status", 10);
   
   for (const auto& name : rotation_name_)
   {
@@ -49,8 +59,20 @@ Manager::Manager(
     arm_basic_ctrl_cli_[arm] = std::move(arm_map);
   }
 
-  new_order_srv_ = create_service<NewOrder>(
-    "new_order", 
+  get_robot_status_srv_ = create_service<GetRobotStatus>(
+    "/get_robot_status", 
+    std::bind(&Manager::get_robot_status_cb, this, _1, _2),
+    rmw_qos_profile_services_default,
+    srv_ser_cbg_);
+
+  occupy_srv_ = create_service<Occupy>(
+    "/occupy_robot", 
+    std::bind(&Manager::occupy_cb, this, _1, _2),
+    rmw_qos_profile_services_default,
+    srv_ser_cbg_);
+
+  new_order_srv_ = create_service<NewOrderSrv>(
+    "/new_order", 
     std::bind(&Manager::new_order_cb, this, _1, _2),
     rmw_qos_profile_services_default,
     srv_ser_cbg_);
@@ -71,15 +93,25 @@ Manager::Manager(
     "/place",
     action_cli_cbg_);
 
+  new_order_action_ser_ = rclcpp_action::create_server<NewOrderAction>(
+    this,
+    "/new_order",
+    std::bind(&Manager::new_order_goal_cb, this, _1, _2),
+    std::bind(&Manager::new_order_cancel_cb, this, _1),
+    std::bind(&Manager::new_order_accepted_cb, this, _1),
+    rcl_action_server_get_default_options(),
+    action_ser_cbg_);
+
+  robot_status_.store(RobotStatus::IDLE);
   RCLCPP_INFO(get_logger(), "Manager is up.");
 }
 
 void Manager::new_order_cb(
-  const std::shared_ptr<NewOrder::Request> request, 
-  std::shared_ptr<NewOrder::Response> response)
+  const std::shared_ptr<NewOrderSrv::Request> request, 
+  std::shared_ptr<NewOrderSrv::Response> response)
 {
   const int order_id = request->order.id;
-  const uint8_t table_id = request->order.table_id;
+  const uint8_t port_id = request->order.port_id;
   auto order_items = request->order.order_items;
   
   if (order_items.size() > MAX_ORDER_ITEMS)
@@ -88,13 +120,13 @@ void Manager::new_order_cb(
     return;
   }
 
-  if (table_id == 0)
+  if (port_id == 0)
   {
     response->message = "Incorrect table id";
     return;
   }
 
-  RCLCPP_INFO(this->get_logger(), "Processing new order ID: %d for table: %d", order_id, table_id);
+  RCLCPP_INFO(get_logger(), "Processing new order ID: %d for table: %d", order_id, port_id);
   std::vector<bool> items_completed(order_items.size(), false);
   std::vector<double> items_pick_height(order_items.size(), false);
   std::vector<bool> place_occupancy_map;
@@ -102,42 +134,42 @@ void Manager::new_order_cb(
 
   bool all_items_completed = false;
 
-  while (!all_items_completed) 
+  while (rclcpp::ok() && !all_items_completed) 
   {
     // Step 1: Choose 1-2 not finished SKUs from list
     std::vector<size_t> selected_indices = select_next_items(order_items, items_completed);
     
     if (selected_indices.empty()) 
     {
-      RCLCPP_INFO(this->get_logger(), "All items completed for order %d", order_id);
+      RCLCPP_INFO(get_logger(), "All items completed for order %d", order_id);
       break;
     }
-    RCLCPP_INFO(this->get_logger(), "Selected %zu items to process", selected_indices.size());
+    RCLCPP_INFO(get_logger(), "Selected %zu items to process", selected_indices.size());
 
     // Step 2: Navigate to rack
     // if (!navigate_to_rack(rack_info.id)) 
     // {
-    //   RCLCPP_ERROR(this->get_logger(), "Failed to navigate to rack %d", rack_info.id);
+    //   RCLCPP_ERROR(get_logger(), "Failed to navigate to rack %d", rack_info.id);
     //   response->success = false;
     //   response->message = "Navigation to rack failed";
     //   return;
     // }
 
-    RCLCPP_INFO(this->get_logger(), "Step 7: Rotate to front");
+    RCLCPP_INFO(get_logger(), "Step 7: Rotate to front");
     if (!rotate_to("abs_front"))
     {
-      RCLCPP_ERROR(this->get_logger(), "abs_front");
+      RCLCPP_ERROR(get_logger(), "abs_front");
       return;
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     
-    RCLCPP_INFO(this->get_logger(), "Step 4: Pick item");
+    RCLCPP_INFO(get_logger(), "Step 4: Pick item");
     std::optional<std::map<uint8_t, double>> opt_results = send_pick_goal(order_items, selected_indices);
 
     if (!opt_results.has_value()) 
     {
-      RCLCPP_ERROR(this->get_logger(), "Failed to pick item(s)");
+      RCLCPP_ERROR(get_logger(), "Failed to pick item(s)");
       response->success = false;
       response->message = "Item picking failed";
       return;
@@ -146,28 +178,28 @@ void Manager::new_order_cb(
     std::map<uint8_t, double>& place_height = opt_results.value();
 
     // Step 5: Navigate to table
-    // if (!navigate_to_table(table_id)) 
+    // if (!navigate_to_table(port_id)) 
     // {
-    //   RCLCPP_ERROR(this->get_logger(), "Failed to navigate to table %d", table_id);
+    //   RCLCPP_ERROR(get_logger(), "Failed to navigate to table %d", port_id);
     //   response->success = false;
     //   response->message = "Navigation to table failed";
     //   return;
     // }
 
-    RCLCPP_INFO(this->get_logger(), "Step 7: Rotate to relative back");
+    RCLCPP_INFO(get_logger(), "Step 7: Rotate to relative back");
     if (!rotate_to("abs_back"))
     {
-      RCLCPP_ERROR(this->get_logger(), "abs_back");
+      RCLCPP_ERROR(get_logger(), "abs_back");
       return;
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
     // Step 7: Place all carried items
-    RCLCPP_INFO(this->get_logger(), "Step 7: Place all carried items");
-    if (!send_place_goal(order_items, selected_indices, table_id, place_height, place_occupancy_map)) 
+    RCLCPP_INFO(get_logger(), "Step 7: Place all carried items");
+    if (!send_place_goal(order_items, selected_indices, port_id, place_height, place_occupancy_map)) 
     {
-      RCLCPP_ERROR(this->get_logger(), "Failed to place item SKU");
+      RCLCPP_ERROR(get_logger(), "Failed to place item SKU");
       response->success = false;
       response->message = "Item placement failed";
       return;
@@ -178,7 +210,7 @@ void Manager::new_order_cb(
       // Mark item as completed after successful placement
       const auto& item = order_items[idx];
       items_completed[idx] = true;
-      RCLCPP_INFO(this->get_logger(), "Successfully placed SKU: %d", item.sku.id);
+      RCLCPP_INFO(get_logger(), "Successfully placed SKU: %d", item.sku.id);
     }
 
     for (size_t idx : selected_indices) 
@@ -198,13 +230,76 @@ void Manager::new_order_cb(
 
   if (!rotate_to("abs_front"))
   {
-    RCLCPP_ERROR(this->get_logger(), "abs_front");
+    RCLCPP_ERROR(get_logger(), "abs_front");
     return;
   }
 
   RCLCPP_INFO(get_logger(), "Order %d completed successfully", order_id);
   response->success = true;
   response->message = "Order processed successfully";
+}
+
+void Manager::get_robot_status_cb(
+  const std::shared_ptr<GetRobotStatus::Request> request, 
+  std::shared_ptr<GetRobotStatus::Response> response)
+{
+  (void) request;
+  
+  RobotStatus msg;
+  msg.state = robot_status_.load();
+
+  response->status = std::move(msg);
+  response->success = true;
+}
+
+void Manager::occupy_cb(
+  const std::shared_ptr<Occupy::Request> request, 
+  std::shared_ptr<Occupy::Response> response)
+{
+  RobotStatus msg;
+  msg.state = robot_status_.load();
+
+  response->status = std::move(msg);
+
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+
+    if (!client_name_.empty())
+    {
+      response->message = "Robot is occupied by " + client_name_;
+      RCLCPP_WARN(get_logger(), "Robot is occupied by %s", client_name_.c_str());
+      return;
+    }
+
+    client_name_ = request->client_name;
+  }
+
+  response->success = true;
+  RCLCPP_WARN(get_logger(), "Occupy request is accepted [%s]", request->client_name.c_str());
+  clear_occupy_timer_->reset();
+}
+
+void Manager::robot_status_cb(void)
+{
+  if (!robot_status_pub_ || robot_status_pub_->get_subscription_count() == 0)
+    return;
+
+  RobotStatus msg;
+  msg.state = robot_status_.load();
+  robot_status_pub_->publish(msg);
+}
+
+void Manager::clear_occupancy_cb(void)
+{
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (client_name_.empty())
+      RCLCPP_WARN(get_logger(), "client_name is empty but clear occupancy timer triggered");
+    else
+      client_name_.clear();
+  }
+
+  clear_occupy_timer_->cancel();
 }
 
 void Manager::testing_cb(void)
