@@ -80,6 +80,8 @@ set(manipulation_files
   src/manipulation/workflow_planner/strategy/place.cpp
   src/manipulation/workflow_planner/strategy/scan.cpp
 
+  src/manipulation/workflow_planner/service_server/operation.cpp
+  
   src/manipulation/workflow_planner/action_server/pick.cpp
   src/manipulation/workflow_planner/action_server/place.cpp
   src/manipulation/workflow_planner/action_server/scan_sku.cpp

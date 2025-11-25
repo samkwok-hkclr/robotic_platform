@@ -58,7 +58,8 @@ public:
 
 	virtual Pose compose_pose_msg(const std::vector<double>& pose_vec) const;
 
-	virtual void pose_translation(Pose::SharedPtr pose, float x, float y, float z);
+  // deprecated
+	// virtual void pose_translation(Pose::SharedPtr pose, float x, float y, float z);
 
   virtual void print_pose(const Pose& pose) const;
   virtual void print_pose_arr(const std::vector<Pose>& poses) const;

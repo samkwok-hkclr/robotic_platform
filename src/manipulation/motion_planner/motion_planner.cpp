@@ -115,14 +115,14 @@ MotionPlanner::MotionPlanner(
     {
       std::string service_name = "/" + arm_to_str.at(arm) + "/move_to_" + std::string(pose_name);
 
-      move_to_srv_.emplace_back(
-        create_service<std_srvs::srv::Trigger>(
+      move_to_srv_.emplace_back(std::move(
+        create_service<Trigger>(
           service_name,
           std::bind(&MotionPlanner::move_to_cb, this, _1, _2, arm, pose_name),
           rmw_qos_profile_services_default,
           srv_ser_cbg_
         )
-      );
+      ));
         
       RCLCPP_INFO(this->get_logger(), "Created service: %s", service_name.c_str());
     }
@@ -207,6 +207,12 @@ void MotionPlanner::testing_cb(
   std::shared_ptr<Trigger::Response> response)
 {
   (void) request;
+
+  if (!simulation_)
+  {
+    RCLCPP_ERROR(get_logger(), "For simulation only");
+    return;
+  }
 
   const std::array<RobotArm, 1> target_arms = {RobotArm::LEFT};
   std::map<RobotArm, std::vector<std::pair<double, double>>> limits;

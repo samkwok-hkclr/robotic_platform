@@ -90,9 +90,6 @@ bool MotionPlanner::try_to_place_by_vac(
     if (simulation_)
       return;
 
-    if (!enable_ultrasonic_)
-      return;
-
     if (!start_to_valid.load()) 
       return;
 
@@ -140,7 +137,10 @@ bool MotionPlanner::try_to_place_by_vac(
     }
   };
 
-  auto range_sub = create_subscription<Range>("ultrasonic_range", 10, range_cb);
+  if (enable_ultrasonic_)
+  {
+    auto range_sub = create_subscription<Range>("ultrasonic_range", 10, range_cb);
+  }
 
   if (!move_to(arm, pre_place_pose, 75.0))
     return false;
@@ -151,16 +151,22 @@ bool MotionPlanner::try_to_place_by_vac(
   if (!gripper_action(arm, false))
     return false;
 
-  start_to_valid.store(true);
+  if (enable_ultrasonic_)
+  {
+    start_to_valid.store(true);
+  }
   std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-  if (mono_increasing.load()) 
+  if (enable_ultrasonic_)
   {
-    RCLCPP_WARN(get_logger(), "Object is moving far away from expected range.");
-  }
-  else
-  {
-    RCLCPP_ERROR(get_logger(), "Range validation failed!");
+    if (mono_increasing.load()) 
+    {
+      RCLCPP_WARN(get_logger(), "Object is moving far away from expected range.");
+    }
+    else
+    {
+      RCLCPP_ERROR(get_logger(), "Range validation failed!");
+    }
   }
 
   RCLCPP_WARN(get_logger(), "Moved the place poses");

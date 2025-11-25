@@ -137,26 +137,8 @@ void FoldElevatorDriver::move_to_cb(
   std::shared_ptr<Trigger::Response> response)
 {
   (void) request;
-  
-  auto req = std::make_shared<ExecuteJoints::Request>();
-  req->joints.insert(req->joints.end(), home_joints_.begin(), home_joints_.end());
 
-  ExecuteJoints::Response::SharedPtr res;
-  if (!send_sync_req<ExecuteJoints>(exec_joints_cli_, std::move(req), res, __FUNCTION__)) 
-  {
-    RCLCPP_ERROR(get_logger(), "Sent ExecuteJoints request failed");
-    return;
-  }
-
-  if (!res->success) 
-  {
-    RCLCPP_WARN(get_logger(), "ExecuteJoints rejected");
-    return;
-  }
-
-  RCLCPP_INFO(get_logger(), "Successfully elevated fold elevator");
-  response->success = true;
-  return;
+  response->success = move_to_home_joint();
 }
 
 void FoldElevatorDriver::rotate_cb(

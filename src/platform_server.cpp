@@ -23,7 +23,6 @@ int main(int argc, char **argv)
   auto fold_elev_driver = std::make_shared<FoldElevatorDriver>(options);
 
   // auto collision_planner = std::make_shared<CollisionPlanner>(options);
-  // auto action_planner = std::make_shared<ActionPlanner>(options);
   auto motion_planner = std::make_shared<MotionPlanner>(options, vac_gripper, finger_gripper);
   auto workflow_planner = std::make_shared<WorkflowPlanner>(options, fold_elev_driver, motion_planner);
 
@@ -34,7 +33,6 @@ int main(int argc, char **argv)
   exec->add_node(fold_elev_driver->get_node_base_interface());
 
   // exec->add_node(collision_planner->get_node_base_interface());
-  // exec->add_node(action_planner->get_node_base_interface());
   exec->add_node(motion_planner->get_node_base_interface());
   exec->add_node(workflow_planner->get_node_base_interface());
   

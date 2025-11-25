@@ -49,6 +49,7 @@ public:
   explicit FoldElevatorDriver(const rclcpp::NodeOptions& options);
   ~FoldElevatorDriver();
 
+  bool move_to_home_joint(void);
   double get_last_joint_diff(void);
   tf2::Quaternion clean_quat(const tf2::Quaternion& quat, double threshold = 1e-6);
   bool exec_wps(std::vector<Pose> wps);

@@ -29,7 +29,6 @@ WorkflowPlanner::WorkflowPlanner(
   get_parameter("sim", simulation_);
   get_parameter("valid_z_threshold", valid_z_threshold_);
   get_parameter("max_scan_attempt", max_scan_attempt_);
-  get_parameter("place_offset", place_offset_);
   get_parameter("optimal_arm_flat_height_distance", optimal_arm_flat_height_distance_);
   get_parameter("table_front_offset", table_front_offset_);
   get_parameter("table_height_offset", table_height_offset_);
@@ -45,10 +44,14 @@ WorkflowPlanner::WorkflowPlanner(
   cam_srv_cli_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   exec_timer_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
   tf_timer_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
+  srv_ser_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
   init_timer_ = create_wall_timer(
-    std::chrono::milliseconds(5000), 
+    std::chrono::seconds(5), 
     std::bind(&WorkflowPlanner::init_cb, this));
+
+  if (simulation_)
+    init_timer_->cancel();
 
   tf_pub_timer_ = create_wall_timer(
     std::chrono::milliseconds(20), 
@@ -105,6 +108,20 @@ WorkflowPlanner::WorkflowPlanner(
     plan_srv_cli_cbg_);
 
   RCLCPP_INFO(get_logger(), "Workflow Planner - initiated service clients");
+
+  simple_pick_srv_ = create_service<SimplePick>(
+    "simple_pick",
+    std::bind(&WorkflowPlanner::simple_pick_cb, this, _1, _2),
+    rmw_qos_profile_services_default,
+    srv_ser_cbg_);
+
+  simple_place_srv_ = create_service<SimplePlace>(
+    "simple_place",
+    std::bind(&WorkflowPlanner::simple_place_cb, this, _1, _2),
+    rmw_qos_profile_services_default,
+    srv_ser_cbg_);
+
+  RCLCPP_INFO(get_logger(), "Workflow Planner - initiated service servers");
 
   pick_action_ser_ = rclcpp_action::create_server<Pick>(
     this,
@@ -164,7 +181,7 @@ void WorkflowPlanner::setup_camera_transform(RobotArm arm, const std::string& ca
   } 
   else 
   {
-    g_tcp__cam_[arm] = get_g(0, 0, 0, 0, 0, 0, 0);
+    g_tcp__cam_[arm] = get_g(0, 0, 0, 0, 0, 0, 1);
     RCLCPP_WARN(get_logger(), "g_tcp__%s_cam_ not defined, using identity", cam_name.c_str());
   }
   

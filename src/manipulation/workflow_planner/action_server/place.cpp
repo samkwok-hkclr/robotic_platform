@@ -70,16 +70,18 @@ void WorkflowPlanner::place_execution(const std::shared_ptr<GoalHandlerPlace> go
 
   RCLCPP_INFO(get_logger(), "Starting Place action sequence with %zu tasks", goal->tasks.size());
 
+  const double place_offset = get_parameter("place_offset").as_double();
+  
   for (const auto& [arm_id, sku_id, height, table, dimension] : goal->tasks) 
   {
     const RobotArm arm = static_cast<RobotArm>(arm_id);
     PlaceResult msg;
     msg.arm_id = arm_id;
 
-    if (height <= place_offset_)
+    if (height <= place_offset)
     {
-      RCLCPP_WARN(get_logger(), "Height (%.4f) should not be less than or equal to place_offset_ (%.4f) in %s arm", 
-        height, place_offset_, arm_to_str.at(arm).c_str());
+      RCLCPP_WARN(get_logger(), "Height (%.4f) should not be less than or equal to place_offset (%.4f) in %s arm", 
+        height, place_offset, arm_to_str.at(arm).c_str());
       msg.message = "Invalid height - below safety threshold";
       msg.success = false;
       result->results.emplace_back(msg);

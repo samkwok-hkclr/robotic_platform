@@ -48,6 +48,8 @@
 #include "robotic_platform_msgs/srv/get_object_pose_trigger.hpp"
 #include "robotic_platform_msgs/srv/pick_plan.hpp"
 #include "robotic_platform_msgs/srv/place_plan.hpp"
+#include "robotic_platform_msgs/srv/simple_pick.hpp"
+#include "robotic_platform_msgs/srv/simple_place.hpp"
 
 #include "planner_base.hpp"
 #include "elevation/fold_elevator_driver.hpp"
@@ -92,6 +94,8 @@ class WorkflowPlanner : public PlannerBase
   using GetObjectPoseTrigger = robotic_platform_msgs::srv::GetObjectPoseTrigger;
   using PickPlan = robotic_platform_msgs::srv::PickPlan;
   using PlacePlan = robotic_platform_msgs::srv::PlacePlan;
+  using SimplePick = robotic_platform_msgs::srv::SimplePick;
+  using SimplePlace = robotic_platform_msgs::srv::SimplePlace;
 
   using Pick = robotic_platform_msgs::action::Pick;
   using Place = robotic_platform_msgs::action::Place;
@@ -161,7 +165,6 @@ private:
   
   double valid_z_threshold_;
   uint16_t max_scan_attempt_;
-  double place_offset_;
 
   double optimal_arm_flat_height_distance_;
   double optimal_arm_flat_front_distance_;
@@ -178,6 +181,7 @@ private:
   rclcpp::CallbackGroup::SharedPtr cam_srv_cli_cbg_;
   rclcpp::CallbackGroup::SharedPtr exec_timer_cbg_;
   rclcpp::CallbackGroup::SharedPtr tf_timer_cbg_;
+  rclcpp::CallbackGroup::SharedPtr srv_ser_cbg_;
 
   // ============== Timers ==============
 
@@ -199,12 +203,24 @@ private:
   std::map<RobotArm, rclcpp::Client<GetState>::SharedPtr> get_camera_cli_;
   std::map<RobotArm, rclcpp::Client<ChangeState>::SharedPtr> change_camera_cli_;
 
+  // ============== Services Servers ==============
+
+  rclcpp::Service<SimplePick>::SharedPtr simple_pick_srv_;
+  rclcpp::Service<SimplePlace>::SharedPtr simple_place_srv_;
+
   // ============== Action Sersers ==============
 
   rclcpp_action::Server<Pick>::SharedPtr pick_action_ser_;
   rclcpp_action::Server<Place>::SharedPtr place_action_ser_;
   rclcpp_action::Server<ScanSku>::SharedPtr scan_sku_action_ser_;
   rclcpp_action::Server<Replenish>::SharedPtr replenish_action_ser_;
+
+  void simple_pick_cb(
+    const std::shared_ptr<SimplePick::Request> request, 
+    std::shared_ptr<SimplePick::Response> response);
+  void simple_place_cb(
+    const std::shared_ptr<SimplePlace::Request> request, 
+    std::shared_ptr<SimplePlace::Response> response);
 
   rclcpp_action::GoalResponse pick_goal_cb(
     const rclcpp_action::GoalUUID & uuid, 

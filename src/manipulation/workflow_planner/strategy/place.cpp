@@ -20,9 +20,11 @@ bool WorkflowPlanner::try_to_place_down(
   tf2::fromMsg(tf_stamped.value().transform, g_m__pf);
   print_g(g_m__pf);
 
+  const double place_offset = get_parameter("place_offset").as_double();
+
   double x = 0;
   double y = 0;
-  double z = std::abs(height + place_offset_);
+  double z = std::abs(height + place_offset);
   double roll = 0;
   double pitch = -M_PI / 2;
   double yaw = -M_PI / 2;
@@ -41,7 +43,7 @@ bool WorkflowPlanner::try_to_place_down(
   tf2::fromMsg(tf_stamped.value().transform, g_m__b);
 
   RCLCPP_INFO(get_logger(), "<%s> height: %.3f", __FUNCTION__, height);
-  RCLCPP_INFO(get_logger(), "<%s> height + offset: %.3f", __FUNCTION__, height + place_offset_);
+  RCLCPP_INFO(get_logger(), "<%s> height + offset: %.3f", __FUNCTION__, height + place_offset);
 
   tf2::Transform g_b__pp = g_m__b.inverse() * g_m__pf * g_pf__pp;
   print_g(g_b__pp);

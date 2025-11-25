@@ -85,41 +85,6 @@ geometry_msgs::msg::Pose PlannerBase::cvt_g_to_pose(const tf2::Transform& g) con
   return msg;
 }
 
-void PlannerBase::pose_translation(Pose::SharedPtr pose, float x, float y, float z)
-{
-  // 1. quaternion to rotation matrix (3 by 3)
-  Eigen::Quaternionf quat_original;
-  Eigen::Matrix3f mat_rotation;
-  quat_original.x() = pose->orientation.x;
-  quat_original.y() = pose->orientation.y;
-  quat_original.z() = pose->orientation.z;
-  quat_original.w() = pose->orientation.w;
-  mat_rotation = quat_original.normalized().toRotationMatrix();
-
-  // 2. Create homogeneous transformation matrix (4 by 4)
-  Eigen::Matrix4f mat_transform = Eigen::Matrix4f::Identity();
-  // Set rotation part
-  mat_transform.block<3, 3>(0, 0) = mat_rotation;
-  // Set translation part
-  mat_transform(0, 3) = pose->position.x;
-  mat_transform(1, 3) = pose->position.y;
-  mat_transform(2, 3) = pose->position.z;
-
-  // 3. Create translation matrix
-  Eigen::Matrix4f Txyz = Eigen::Matrix4f::Identity();
-  Txyz(0, 3) = x;
-  Txyz(1, 3) = y;
-  Txyz(2, 3) = z;  
-
-  // 4. Apply transformation: first translate, then rotate+translate
-  mat_transform = mat_transform * Txyz;
-  
-  // 5. Update pose
-  pose->position.x = mat_transform(0, 3);
-  pose->position.y = mat_transform(1, 3);
-  pose->position.z = mat_transform(2, 3);
-}
-
 void PlannerBase::print_pose(const Pose& pose) const
 {
   RCLCPP_WARN(get_logger(), "[p.x: %.6f, p.y: %.6f, p.z: %.6f, q.x: %.6f, q.y: %.6f, q.z: %.6f, q.w: %.6f]", 
@@ -294,3 +259,38 @@ std::vector<tf2::Transform> PlannerBase::interpolate_tf(
   return intermediate_poses;
 }
 
+// deprecated
+// void PlannerBase::pose_translation(Pose::SharedPtr pose, float x, float y, float z)
+// {
+//   // 1. quaternion to rotation matrix (3 by 3)
+//   Eigen::Quaternionf quat_original;
+//   Eigen::Matrix3f mat_rotation;
+//   quat_original.x() = pose->orientation.x;
+//   quat_original.y() = pose->orientation.y;
+//   quat_original.z() = pose->orientation.z;
+//   quat_original.w() = pose->orientation.w;
+//   mat_rotation = quat_original.normalized().toRotationMatrix();
+
+//   // 2. Create homogeneous transformation matrix (4 by 4)
+//   Eigen::Matrix4f mat_transform = Eigen::Matrix4f::Identity();
+//   // Set rotation part
+//   mat_transform.block<3, 3>(0, 0) = mat_rotation;
+//   // Set translation part
+//   mat_transform(0, 3) = pose->position.x;
+//   mat_transform(1, 3) = pose->position.y;
+//   mat_transform(2, 3) = pose->position.z;
+
+//   // 3. Create translation matrix
+//   Eigen::Matrix4f Txyz = Eigen::Matrix4f::Identity();
+//   Txyz(0, 3) = x;
+//   Txyz(1, 3) = y;
+//   Txyz(2, 3) = z;  
+
+//   // 4. Apply transformation: first translate, then rotate+translate
+//   mat_transform = mat_transform * Txyz;
+  
+//   // 5. Update pose
+//   pose->position.x = mat_transform(0, 3);
+//   pose->position.y = mat_transform(1, 3);
+//   pose->position.z = mat_transform(2, 3);
+// }
