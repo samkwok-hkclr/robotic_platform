@@ -25,7 +25,7 @@ TfBroadcaster::TfBroadcaster(
 	tf_timer_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 
 	tf_pub_timer = create_wall_timer(
-    std::chrono::milliseconds(20), 
+    std::chrono::milliseconds(50), 
     std::bind(&TfBroadcaster::tf_pub_cb, this),
     tf_timer_cbg_);
 
@@ -105,9 +105,26 @@ void TfBroadcaster::tf_pub_cb(void)
 {
 	std::lock_guard<std::mutex> lock(tf_mutex_);
 
+  if (tf_buf_.empty())
+    return;
+  
   for (const auto& tf : tf_buf_)
   {
     std::apply(std::bind(&TfBroadcaster::send_transform, this, _1, _2, _3), tf);
   }
 }
 
+int main(int argc, char **argv)
+{
+  rclcpp::init(argc, argv);
+
+  auto exec = std::make_shared<rclcpp::executors::MultiThreadedExecutor>();
+  auto options = rclcpp::NodeOptions();
+
+  auto tf_broadcaster = std::make_shared<TfBroadcaster>("tf_broadcaster", options);
+  exec->add_node(tf_broadcaster->get_node_base_interface());
+  
+  exec->spin();
+
+  rclcpp::shutdown();
+}

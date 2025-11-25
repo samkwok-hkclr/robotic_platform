@@ -55,6 +55,7 @@ private:
   std::atomic<float> temperature_{0.0f};
 
   float leak_threshold_;
+  bool enable_ultrasonic_;
 
   rclcpp::CallbackGroup::SharedPtr srv_cli_cbg_;
 

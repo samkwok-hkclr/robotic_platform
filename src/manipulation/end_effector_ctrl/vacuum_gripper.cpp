@@ -4,7 +4,9 @@ VacuumGripper::VacuumGripper(
   const rclcpp::NodeOptions& options)
 : NodeBase("vacuum_gripper", options)
 {
+  declare_parameter<bool>("enable_ultrasonic", false);
   declare_parameter<double>("leak_threshold", 0.0);
+  get_parameter("enable_ultrasonic", enable_ultrasonic_);
   get_parameter("leak_threshold", leak_threshold_);
 
   if (std::abs(leak_threshold_) <= 0.01)
@@ -27,20 +29,23 @@ VacuumGripper::VacuumGripper(
     rmw_qos_profile_services_default,
     srv_cli_cbg_);
 
-  state_sub_ = create_subscription<Bool>(
-    "vacuum_gripper_status", 
-    10, 
-    std::bind(&VacuumGripper::state_cb, this, _1));
+  if (enable_ultrasonic_)
+  {
+    state_sub_ = create_subscription<Bool>(
+      "vacuum_gripper_status", 
+      10, 
+      std::bind(&VacuumGripper::state_cb, this, _1));
 
-  range_sub_ = create_subscription<Range>(
-    "ultrasonic_range", 
-    10, 
-    std::bind(&VacuumGripper::range_cb, this, _1));
+    range_sub_ = create_subscription<Range>(
+      "ultrasonic_range", 
+      10, 
+      std::bind(&VacuumGripper::range_cb, this, _1));
 
-  temp_sub_ = create_subscription<Temperature>(
-    "ultrasonic_sensor_internal_temperature", 
-    10, 
-    std::bind(&VacuumGripper::temp_cb, this, _1));
+    temp_sub_ = create_subscription<Temperature>(
+      "ultrasonic_sensor_internal_temperature", 
+      10, 
+      std::bind(&VacuumGripper::temp_cb, this, _1));
+  }
 
   pressure_sub_ = create_subscription<FluidPressure>(
     "vaccum_pressure", 

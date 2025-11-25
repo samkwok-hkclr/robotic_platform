@@ -45,7 +45,6 @@ include_directories(
 set(common_files
   src/node_base.cpp
   src/planner_base.cpp
-  src/tf_broadcaster.cpp
 )
 
 set(manager_files
@@ -114,6 +113,29 @@ ament_target_dependencies(manager
 )
 target_compile_features(manager PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
 
+add_executable(tf_broadcaster 
+  ${common_files}
+  src/tf_broadcaster.cpp
+)
+target_include_directories(tf_broadcaster PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+ament_target_dependencies(tf_broadcaster
+  rclcpp
+  tf2
+  tf2_ros
+  tf2_geometry_msgs
+  std_msgs
+  std_srvs
+  geometry_msgs
+  robot_controller_msgs
+  robotic_platform_msgs
+  robostore_msgs
+)
+target_compile_features(tf_broadcaster PUBLIC c_std_99 cxx_std_17)  # Require C99 and C++17
+
+
 add_executable(action_planner 
   ${common_files}
   src/manipulation/action_planner/action_planner.cpp
@@ -173,6 +195,7 @@ install(TARGETS
   manager
   platform_server
   action_planner
+  tf_broadcaster
   DESTINATION lib/${PROJECT_NAME}
 )
 

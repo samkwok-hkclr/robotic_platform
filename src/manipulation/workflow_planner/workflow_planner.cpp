@@ -192,6 +192,9 @@ void WorkflowPlanner::tf_pub_cb(void)
 {
   std::lock_guard<std::mutex> lock(tf_mutex_);
 
+  if (tf_buf_.empty())
+    return;
+  
   for (const auto& tf : tf_buf_)
   {
     std::apply(std::bind(&WorkflowPlanner::send_transform, this, _1, _2, _3), tf);

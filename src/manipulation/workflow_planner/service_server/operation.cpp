@@ -17,16 +17,15 @@ void WorkflowPlanner::simple_pick_cb(
   }
 
   fold_elev_driver_->move_to_home_joint();
-
   fold_elev_driver_->elevate(0.05, -0.05, 0);
 
+  // op: object pose
+  // pop: pre object pose
+  // lop: lifted object pose
+  tf2::Transform g_op__pop = get_g(0, 0, -0.15, 0, 0, 0);
+  tf2::Transform g_op__lop = get_g(0.02, 0, 0, 0, 0, 0);
   if (request->enable_left)
   {
-    // op: object pose
-    // pop: pre object pose
-    // lop: lifted object pose
-    tf2::Transform g_op__pop = get_g(0, 0, -0.1, 0, 0, 0);
-    tf2::Transform g_op__lop = get_g(0.02, 0, 0, 0, 0, 0);
     Pose pre_obj_pose = cvt_g_to_pose(get_g(request->object_pose_left) * g_op__pop);
     Pose lifted_obj_pose = cvt_g_to_pose(get_g(request->object_pose_left) * g_op__lop);
     Pose lifted_back_obj_pose = cvt_g_to_pose(get_g(lifted_obj_pose) * g_op__pop);
@@ -35,7 +34,7 @@ void WorkflowPlanner::simple_pick_cb(
     motion_planner_->gripper_action(RobotArm::LEFT_ACTION, true);
     motion_planner_->move_to(RobotArm::LEFT_ACTION, request->object_pose_left, 75);
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-    motion_planner_->move_to(RobotArm::LEFT_ACTION, lifted_obj_pose, 100);
+    // motion_planner_->move_to(RobotArm::LEFT_ACTION, lifted_obj_pose, 100);
     motion_planner_->move_to(RobotArm::LEFT_ACTION, lifted_back_obj_pose, 100);
 
     motion_planner_->move_to_holding_pose(RobotArm::LEFT_ACTION, 100);
@@ -43,27 +42,21 @@ void WorkflowPlanner::simple_pick_cb(
 
   if (request->enable_right)
   {
-    // op: object pose
-    // pop: pre object pose
-    // lop: lifted object pose
-    tf2::Transform g_op__pop = get_g(0, 0, -0.1, 0, 0, 0);
-    tf2::Transform g_op__lop = get_g(0.02, 0, 0, 0, 0, 0);
     Pose pre_obj_pose = cvt_g_to_pose(get_g(request->object_pose_right) * g_op__pop);
     Pose lifted_obj_pose = cvt_g_to_pose(get_g(request->object_pose_right) * g_op__lop);
     Pose lifted_back_obj_pose = cvt_g_to_pose(get_g(lifted_obj_pose) * g_op__pop);
 
     motion_planner_->move_to(RobotArm::RIGHT_ACTION, pre_obj_pose, 100);
-    motion_planner_->move_to(RobotArm::RIGHT_ACTION, request->object_pose_right, 75);
+    motion_planner_->move_to(RobotArm::RIGHT_ACTION, request->object_pose_right, 50);
     motion_planner_->gripper_action(RobotArm::RIGHT_ACTION, true);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-    motion_planner_->move_to(RobotArm::RIGHT_ACTION, lifted_obj_pose, 100);
+    std::this_thread::sleep_for(std::chrono::milliseconds(1500));
+    motion_planner_->move_to(RobotArm::RIGHT_ACTION, lifted_obj_pose, 75);
     motion_planner_->move_to(RobotArm::RIGHT_ACTION, lifted_back_obj_pose, 100);
 
     motion_planner_->move_to_holding_pose(RobotArm::RIGHT_ACTION, 100);
   }
 
   fold_elev_driver_->move_to_home_joint();
-
   fold_elev_driver_->rotate_to_abs_front();
 
   clear_tf_buf();
@@ -85,25 +78,24 @@ void WorkflowPlanner::simple_place_cb(
   }
 
   fold_elev_driver_->move_to_home_joint();
-
-  fold_elev_driver_->elevate(0.05, -0.1, 0);
+  fold_elev_driver_->elevate(0.05, -0.05, 0);
 
   // pp: place pose
   // ppp: pre place pose
   // pdp: place down pose
   // lpp: lifted place pose
+  tf2::Transform g_pp__ppp = get_g(0, 0, -0.1, 0, 0, 0);
+  tf2::Transform g_pp__pdp = get_g(-0.01, 0, 0, 0, 0, 0);
+
   if (request->enable_left)
   {
-    tf2::Transform g_pp__ppp = get_g(0, 0, -0.1, 0, 0, 0);
-    tf2::Transform g_pp__pdp = get_g(-0.01, 0, 0, 0, 0, 0);
-
     Pose pre_place_pose = cvt_g_to_pose(get_g(request->place_pose_left) * g_pp__ppp);
-    Pose place_down_pose = cvt_g_to_pose(get_g(request->place_pose_left) * g_pp__pdp);
-    Pose lifted_place_pose = cvt_g_to_pose(get_g(request->place_pose_left) * g_pp__ppp * g_pp__pdp);
+    // Pose place_down_pose = cvt_g_to_pose(get_g(request->place_pose_left) * g_pp__pdp);
+    Pose lifted_place_pose = cvt_g_to_pose(get_g(request->place_pose_left) * g_pp__ppp);
 
-    motion_planner_->move_to(RobotArm::LEFT_ACTION, pre_place_pose, 100);
-    motion_planner_->move_to(RobotArm::LEFT_ACTION, request->place_pose_left, 100);
-    motion_planner_->move_to(RobotArm::LEFT_ACTION, place_down_pose, 50);
+    motion_planner_->move_to(RobotArm::LEFT_ACTION, pre_place_pose, 75);
+    motion_planner_->move_to(RobotArm::LEFT_ACTION, request->place_pose_left, 50);
+    // motion_planner_->move_to(RobotArm::LEFT_ACTION, place_down_pose, 50);
 
     motion_planner_->gripper_action(RobotArm::LEFT_ACTION, false);
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -115,9 +107,6 @@ void WorkflowPlanner::simple_place_cb(
 
   if (request->enable_right)
   {
-    tf2::Transform g_pp__ppp = get_g(0, 0, -0.1, 0, 0, 0);
-    tf2::Transform g_pp__pdp = get_g(-0.01, 0, 0, 0, 0, 0);
-
     Pose pre_place_pose = cvt_g_to_pose(get_g(request->place_pose_right) * g_pp__ppp);
     Pose place_down_pose = cvt_g_to_pose(get_g(request->place_pose_right) * g_pp__pdp);
     Pose lifted_place_pose = cvt_g_to_pose(get_g(request->place_pose_right) * g_pp__ppp * g_pp__pdp);
@@ -135,7 +124,6 @@ void WorkflowPlanner::simple_place_cb(
   }
 
   fold_elev_driver_->move_to_home_joint();
-
   fold_elev_driver_->rotate_to_abs_front();
 
   clear_tf_buf();
