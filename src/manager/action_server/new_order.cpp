@@ -7,13 +7,13 @@ rclcpp_action::GoalResponse Manager::new_order_goal_cb(
   RCLCPP_INFO(get_logger(), "Received goal request with order");
   (void)uuid;
   
-  const auto& order_id = goal->order.id;
-  const auto& items = goal->order.order_items;
-  const auto& port_id = goal->order.port_id;
-  const auto& client_name = goal->client_name;
+  const std::string& order_id = goal->order.id;
+  const std::vector<OrderItem>& items = goal->order.order_items;
+  const uint8_t& port_id = goal->order.port_id;
+  const std::string& client_name = goal->client_name;
 
   size_t num_of_items = std::accumulate(items.begin(), items.end(), size_t{0}, 
-    [](size_t sum, const auto& item) { return sum + item.qty; });
+    [](size_t sum, const OrderItem& item) { return sum + item.qty; });
 
   if (num_of_items > MAX_ORDER_ITEMS)
   {
@@ -25,6 +25,12 @@ rclcpp_action::GoalResponse Manager::new_order_goal_cb(
   if (port_id == 0)
   {
     RCLCPP_ERROR(get_logger(), "Incorrect port id");
+    return rclcpp_action::GoalResponse::REJECT;
+  }
+
+  if (robot_status_.load() != RobotStatus::IDLE)
+  {
+    RCLCPP_ERROR(get_logger(), "Robot is not in idle state");
     return rclcpp_action::GoalResponse::REJECT;
   }
 
@@ -43,6 +49,8 @@ rclcpp_action::GoalResponse Manager::new_order_goal_cb(
     else if (client_name == client_name_)
     {
       RCLCPP_WARN(get_logger(), "client_name is matched!");
+      client_name_.clear();
+      clear_occupy_timer_->cancel();
       robot_status_.store(RobotStatus::BUSY);
     }
     else
@@ -52,20 +60,23 @@ rclcpp_action::GoalResponse Manager::new_order_goal_cb(
     }
   }
 
-  RCLCPP_INFO(get_logger(), "Processing new order ID: %d for port: %d", order_id, port_id);
+  RCLCPP_INFO(get_logger(), "Processing new order ID: %s for port: %d", order_id.c_str(), port_id);
   return rclcpp_action::GoalResponse::ACCEPT_AND_EXECUTE;
 }
 
 rclcpp_action::CancelResponse Manager::new_order_cancel_cb(const std::shared_ptr<NewOrderGoalHandle> goal_handle)
 {
   RCLCPP_INFO(get_logger(), "Received request to cancel goal");
-  (void)goal_handle;
+  (void) goal_handle;
 
   return rclcpp_action::CancelResponse::ACCEPT;
 }
 
 void Manager::new_order_accepted_cb(const std::shared_ptr<NewOrderGoalHandle> goal_handle)
 {
-  std::thread{std::bind(&Manager::order_execution, this, _1), goal_handle}.detach();
+  if (simulation_)
+    std::thread{std::bind(&Manager::order_execution_sim, this, _1), goal_handle}.detach();
+  else
+    std::thread{std::bind(&Manager::order_execution, this, _1), goal_handle}.detach();
 }
 

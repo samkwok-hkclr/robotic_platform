@@ -78,6 +78,9 @@ public:
     const std::vector<OrderItem>& items, 
     const std::vector<bool>& items_completed);
 
+  template<typename T1, typename T2>
+  bool compare_same_item(const T1& item1, const T2& item2);
+
   std::optional<std::map<uint8_t, double>> send_pick_goal(
     const std::vector<OrderItem>& order_items,
     const std::vector<size_t>& items_selected);
@@ -97,6 +100,8 @@ public:
   }
 
 private:
+  bool simulation_;
+
   std::mutex mutex_;
   std::atomic<uint8_t> robot_status_;
   std::string client_name_;
@@ -145,6 +150,7 @@ private:
   void new_order_accepted_cb(const std::shared_ptr<NewOrderGoalHandle> goal_handle);
 
   void order_execution(const std::shared_ptr<NewOrderGoalHandle> goal_handle);
+  void order_execution_sim(const std::shared_ptr<NewOrderGoalHandle> goal_handle);
 
   void pick_feedback_cb(PickGoalHandle::SharedPtr, const std::shared_ptr<const Pick::Feedback> feedback);
   void place_feedback_cb(PlaceGoalHandle::SharedPtr, const std::shared_ptr<const Place::Feedback> feedback);

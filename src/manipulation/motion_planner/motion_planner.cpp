@@ -148,7 +148,7 @@ void MotionPlanner::move_to_cb(
   std::string_view pose)
 {
   (void) request;
-  const float default_speed = 100.0f;
+  const float default_speed = 50.0f;
 
   auto arm_it = pose_actions.find(arm);
   

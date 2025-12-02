@@ -45,10 +45,10 @@ bool MotionPlanner::try_to_pick_by_vac(
 
     start_leak_valid.store(true);
 
-    // while (leak_detected.load() && (std::chrono::steady_clock::now() - start) < leak_check_duration) 
-    // {
-    //   std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    // }
+    while (leak_detected.load() && (std::chrono::steady_clock::now() - start) < leak_check_duration) 
+    {
+      std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    }
 
     if (leak_detected.load()) 
     {

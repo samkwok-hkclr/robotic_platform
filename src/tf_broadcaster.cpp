@@ -17,10 +17,11 @@ TfBroadcaster::TfBroadcaster(
 
   // FIXME: the frames should be provided by AGV
 	// push_tf_buf(std::make_tuple(cvt_g_to_pose(get_g(0.8, 1.35, 0, 0, 0, M_PI/2)), "map", BASE_FOOTPRINT));
-	push_tf_buf(std::make_tuple(cvt_g_to_pose(get_g(1.0, 1.0, 0, 0, 0, 0)), "map", BASE_FOOTPRINT));
+	// push_tf_buf(std::make_tuple(cvt_g_to_pose(get_g(1.0, 1.0, 0, 0, 0, 0)), "map", BASE_FOOTPRINT));
+	push_tf_buf(std::make_tuple(cvt_g_to_pose(get_g(0, 0, 0, 0, 0, 0)), "map", BASE_FOOTPRINT));
 
   setup_tcp_tf();
-  setup_static_tf();
+  // setup_static_tf();
 
 	tf_timer_cbg_ = create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
 

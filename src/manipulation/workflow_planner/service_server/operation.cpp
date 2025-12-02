@@ -1,5 +1,7 @@
 #include "manipulation/workflow_planner/workflow_planner.hpp"
 
+// This services is for testing and demonstration only
+
 void WorkflowPlanner::simple_pick_cb(
   const std::shared_ptr<SimplePick::Request> request, 
   std::shared_ptr<SimplePick::Response> response)
@@ -15,23 +17,26 @@ void WorkflowPlanner::simple_pick_cb(
   }
 
   fold_elev_driver_->move_to_home_joint();
-  fold_elev_driver_->elevate(0.05, -0.05, 0);
+  fold_elev_driver_->elevate(0, 0.05, 0);
 
   if (request->enable_left)
   {
     Pose obj_pose = request->object_pose_left;
-    Pose pre_obj_pose = cvt_g_to_pose(get_g(obj_pose) * get_g(0, 0, -0.04, 0, 0, 0));
+    Pose pre_obj_pose = cvt_g_to_pose(get_g(obj_pose) * get_g(0, 0, -0.03, 0, 0, 0));
+    Pose up_obj_pose = cvt_g_to_pose(get_g(obj_pose) * get_g(0, 0, -0.10, 0, 0, 0));
+    Pose hold_up_obj_pose = cvt_g_to_pose(get_g(up_obj_pose) * get_g(-0.05, -0.05, 0, 0, 0, 0));
     Pose holding_pose = cvt_g_to_pose(get_g(0.0, 0.2, 0.66, M_PI, 0, 0));
 
-    motion_planner_->move_to_action_pose(RobotArm::LEFT, 100);
+    motion_planner_->move_to_action_pose(RobotArm::LEFT, 50);
 
-    motion_planner_->move_to(RobotArm::LEFT_ACTION, pre_obj_pose, 75);
+    motion_planner_->move_to(RobotArm::LEFT_ACTION, pre_obj_pose, 50);
     motion_planner_->gripper_action(RobotArm::LEFT_ACTION, true);
     motion_planner_->move_to(RobotArm::LEFT_ACTION, obj_pose, 50);
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-
-    motion_planner_->move_to(RobotArm::LEFT_ACTION, pre_obj_pose, 100);
-    motion_planner_->move_to(RobotArm::LEFT_ACTION, holding_pose, 100);
+    // fold_elev_driver_->elevate(0, 0.05, 0);
+    motion_planner_->move_to(RobotArm::LEFT_ACTION, up_obj_pose, 75);
+    motion_planner_->move_to(RobotArm::LEFT_ACTION, hold_up_obj_pose, 50);
+    motion_planner_->move_to(RobotArm::LEFT_ACTION, holding_pose, 50);
   }
 
   if (request->enable_right)
@@ -78,23 +83,23 @@ void WorkflowPlanner::simple_place_cb(
   }
 
   fold_elev_driver_->move_to_home_joint();
-  fold_elev_driver_->elevate(0.05, -0.05, 0);
+  fold_elev_driver_->elevate(0, 0.05, 0);
 
   if (request->enable_left)
   {
     Pose place_pose = request->place_pose_left;
 
-    Pose pre_place_pose = cvt_g_to_pose(get_g(place_pose) * get_g(0, 0, -0.1, 0, 0, 0));
+    Pose pre_place_pose = cvt_g_to_pose(get_g(place_pose) * get_g(0, 0, -0.05, 0, 0, 0));
 
-    motion_planner_->move_to(RobotArm::LEFT_ACTION, pre_place_pose, 75);
+    motion_planner_->move_to(RobotArm::LEFT_ACTION, pre_place_pose, 50);
     motion_planner_->move_to(RobotArm::LEFT_ACTION, place_pose, 50);
     // motion_planner_->move_to(RobotArm::LEFT_ACTION, place_down_pose, 50);
 
-    motion_planner_->gripper_action(RobotArm::LEFT_ACTION, false);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-    motion_planner_->move_to(RobotArm::LEFT_ACTION, pre_place_pose, 75);
+    // motion_planner_->gripper_action(RobotArm::LEFT_ACTION, false);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    // motion_planner_->move_to(RobotArm::LEFT_ACTION, pre_place_pose, 50);
     
-    motion_planner_->move_to_home_pose(RobotArm::LEFT_ACTION, 100);
+    // motion_planner_->move_to_home_pose(RobotArm::LEFT_ACTION, 75);
   }
 
   if (request->enable_right)
@@ -121,8 +126,8 @@ void WorkflowPlanner::simple_place_cb(
     motion_planner_->move_to_home_pose(RobotArm::RIGHT_ACTION, 100);
   }
 
-  fold_elev_driver_->move_to_home_joint();
-  fold_elev_driver_->rotate_to_abs_front();
+  // fold_elev_driver_->move_to_home_joint();
+  // fold_elev_driver_->rotate_to_abs_front();
 
   clear_tf_buf();
   response->success = true;
